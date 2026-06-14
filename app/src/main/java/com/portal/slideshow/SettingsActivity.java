@@ -1,0 +1,233 @@
+package com.portal.slideshow;
+
+import android.app.Activity;
+import android.content.SharedPreferences;
+import android.graphics.Color;
+import android.os.Bundle;
+import android.text.InputType;
+import android.text.TextUtils;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+public class SettingsActivity extends Activity {
+
+    private EditText urlField;
+    private EditText assistantUrlField;
+    private RadioButton rStream, rDownload, rBundled;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setTitle("Slideshow Settings");
+
+        SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
+        String url = p.getString(MainActivity.KEY_URL, "");
+        String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
+        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_BUNDLED);
+        boolean hasBundled = hasBundledVideo();
+
+        ScrollView scroll = new ScrollView(this);
+        scroll.setBackgroundColor(Color.parseColor("#10131A"));
+
+        LinearLayout col = new LinearLayout(this);
+        col.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(28);
+        col.setPadding(pad, pad, pad, pad);
+        scroll.addView(col);
+
+        col.addView(title("Slideshow Settings"));
+        col.addView(label("Point this Portal at any video. Paste a direct link to an .mp4 file."));
+
+        urlField = new EditText(this);
+        urlField.setHint("https://example.com/family.mp4");
+        urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        urlField.setText(url);
+        urlField.setTextColor(Color.WHITE);
+        urlField.setHintTextColor(Color.parseColor("#7A8090"));
+        urlField.setTextSize(18f);
+        urlField.setMinHeight(dp(64));
+        col.addView(urlField, wide(dp(8)));
+
+        RadioGroup group = new RadioGroup(this);
+        rStream = radio("Stream from the internet (needs Wi-Fi each time)");
+        rDownload = radio("Download once, then play offline");
+        group.addView(rStream);
+        group.addView(rDownload);
+        if (hasBundled) {
+            rBundled = radio("Use the built-in video");
+            group.addView(rBundled);
+        }
+        col.addView(group, wide(dp(16)));
+
+        if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
+        else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
+        else rStream.setChecked(true);
+
+        col.addView(sectionTitle("Portal Assistant"));
+        col.addView(label("Assistant web app URL. This page should host the OpenAI Realtime voice assistant and keep API keys on its server."));
+
+        assistantUrlField = new EditText(this);
+        assistantUrlField.setHint(MainActivity.DEFAULT_ASSISTANT_URL);
+        assistantUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        assistantUrlField.setText(assistantUrl);
+        assistantUrlField.setTextColor(Color.WHITE);
+        assistantUrlField.setHintTextColor(Color.parseColor("#7A8090"));
+        assistantUrlField.setTextSize(18f);
+        assistantUrlField.setMinHeight(dp(64));
+        col.addView(assistantUrlField, wide(dp(8)));
+
+        Button openAssistant = bigButton("Open Assistant", "#00796B");
+        openAssistant.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                if (saveAssistantUrl()) {
+                    startActivity(new android.content.Intent(SettingsActivity.this, AssistantActivity.class));
+                }
+            }
+        });
+        col.addView(openAssistant, wide(dp(16)));
+
+        Button save = bigButton("Save & Play", "#2F6BFF");
+        save.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { save(); }
+        });
+        col.addView(save, wide(dp(24)));
+
+        Button cancel = bigButton("Cancel", "#33394A");
+        cancel.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { finish(); }
+        });
+        col.addView(cancel, wide(dp(12)));
+
+        setContentView(scroll);
+    }
+
+    private void save() {
+        int mode;
+        if (rBundled != null && rBundled.isChecked()) {
+            mode = MainActivity.MODE_BUNDLED;
+        } else if (rDownload.isChecked()) {
+            mode = MainActivity.MODE_DOWNLOAD;
+        } else {
+            mode = MainActivity.MODE_STREAM;
+        }
+        String url = urlField.getText().toString().trim();
+        if (mode != MainActivity.MODE_BUNDLED && TextUtils.isEmpty(url)) {
+            Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (mode != MainActivity.MODE_BUNDLED
+                && !(url.startsWith("http://") || url.startsWith("https://"))) {
+            Toast.makeText(this, "URL must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String assistantUrl = normalizeAssistantUrl();
+        if (!isValidAssistantUrl(assistantUrl)) {
+            Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return;
+        }
+        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
+                .putString(MainActivity.KEY_URL, url)
+                .putInt(MainActivity.KEY_MODE, mode)
+                .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
+                .apply();
+        setResult(RESULT_OK);
+        finish();
+    }
+
+    private boolean saveAssistantUrl() {
+        String assistantUrl = normalizeAssistantUrl();
+        if (!isValidAssistantUrl(assistantUrl)) {
+            Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return false;
+        }
+        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
+                .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
+                .apply();
+        return true;
+    }
+
+    private String normalizeAssistantUrl() {
+        if (assistantUrlField == null) return MainActivity.DEFAULT_ASSISTANT_URL;
+        String assistantUrl = assistantUrlField.getText().toString().trim();
+        if (TextUtils.isEmpty(assistantUrl)) return MainActivity.DEFAULT_ASSISTANT_URL;
+        return assistantUrl;
+    }
+
+    private boolean isValidAssistantUrl(String url) {
+        return url.startsWith("http://") || url.startsWith("https://");
+    }
+
+    private boolean hasBundledVideo() {
+        try {
+            for (String n : getAssets().list("")) if ("slideshow.mp4".equals(n)) return true;
+        } catch (Exception ignored) { }
+        return false;
+    }
+
+    // ---- tiny view helpers ----
+    private TextView title(String t) {
+        TextView v = new TextView(this);
+        v.setText(t);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(26f);
+        v.setPadding(0, 0, 0, dp(12));
+        return v;
+    }
+
+    private TextView label(String t) {
+        TextView v = new TextView(this);
+        v.setText(t);
+        v.setTextColor(Color.parseColor("#B5BCCB"));
+        v.setTextSize(16f);
+        v.setPadding(0, 0, 0, dp(8));
+        return v;
+    }
+
+    private TextView sectionTitle(String t) {
+        TextView v = title(t);
+        v.setTextSize(24f);
+        v.setPadding(0, dp(32), 0, dp(12));
+        return v;
+    }
+
+    private RadioButton radio(String t) {
+        RadioButton r = new RadioButton(this);
+        r.setText(t);
+        r.setTextColor(Color.WHITE);
+        r.setTextSize(18f);
+        r.setMinHeight(dp(64));
+        r.setPadding(dp(8), 0, 0, 0);
+        return r;
+    }
+
+    private Button bigButton(String t, String color) {
+        Button b = new Button(this);
+        b.setText(t);
+        b.setTextSize(20f);
+        b.setAllCaps(false);
+        b.setTextColor(Color.WHITE);
+        b.setBackgroundColor(Color.parseColor(color));
+        b.setMinHeight(dp(72));
+        return b;
+    }
+
+    private LinearLayout.LayoutParams wide(int topMargin) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = topMargin;
+        return lp;
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+}
