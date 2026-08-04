@@ -2,6 +2,10 @@
 
 Fullscreen Android photo-frame app for Meta Portal-style devices.
 
+## Default photos
+
+If no shared album, Drive folder, or video URL is configured, the app starts with bundled default photos. Tap the screen to reveal **Settings**, then paste a shared Google Photos or Google Drive link to replace the defaults on that device.
+
 ## Shared Google Photos or Drive mode
 
 1. In Google Photos or Google Drive, open the album/folder you want to show.

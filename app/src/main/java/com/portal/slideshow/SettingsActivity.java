@@ -49,7 +49,7 @@ public class SettingsActivity extends Activity {
         scroll.addView(col);
 
         col.addView(title("Portal Album Settings"));
-        col.addView(label("Paste a shared Google Photos or Google Drive link so this Portal can become a reusable photo frame without needing a separate website."));
+        col.addView(label("Paste a shared Google Photos or Google Drive link, or leave this blank to use the built-in default photos."));
 
         albumUrlField = new EditText(this);
         albumUrlField.setHint("https://photos.app.goo.gl/... or https://drive.google.com/...");
@@ -156,12 +156,12 @@ public class SettingsActivity extends Activity {
         String url = urlField.getText().toString().trim();
         String albumUrl = albumUrlField.getText().toString().trim();
         String photoHostUrl = normalizePhotoHostUrl();
-        if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
-                && TextUtils.isEmpty(albumUrl)) {
+        if (mode == MainActivity.MODE_PHOTO_HOST && TextUtils.isEmpty(albumUrl)) {
             Toast.makeText(this, "Enter a shared Google Photos or Drive link.", Toast.LENGTH_LONG).show();
             return;
         }
         if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
+                && !TextUtils.isEmpty(albumUrl)
                 && !isValidWebUrl(albumUrl)) {
             Toast.makeText(this, "Album link must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;

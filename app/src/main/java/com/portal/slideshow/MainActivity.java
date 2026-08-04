@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -15,6 +16,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.VideoView;
 import android.webkit.WebSettings;
@@ -28,6 +30,7 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
+import java.util.Arrays;
 
 public class MainActivity extends Activity {
 
@@ -45,14 +48,19 @@ public class MainActivity extends Activity {
     static final int MODE_GOOGLE_PHOTOS = 3;
     static final int MODE_PHOTO_HOST = 4;
     private static final String ASSET_NAME = "slideshow.mp4";
+    private static final String DEFAULT_PHOTO_DIR = "default_photos";
+    private static final long DEFAULT_PHOTO_DELAY_MS = 8000;
     private static final int REQ_SETTINGS = 100;
 
     private VideoView video;
     private WebView albumView;
+    private ImageView defaultPhoto;
     private TextView status;
     private View overlay;
     private Button gear;
     private Button assistant;
+    private String[] defaultPhotoNames;
+    private int defaultPhotoIndex;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable hideGear = new Runnable() {
         public void run() {
@@ -60,6 +68,13 @@ public class MainActivity extends Activity {
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
             if (overlay != null) overlay.setVisibility(View.VISIBLE);
+        }
+    };
+    private final Runnable advanceDefaultPhoto = new Runnable() {
+        public void run() {
+            if (defaultPhoto == null || defaultPhoto.getVisibility() != View.VISIBLE) return;
+            showNextDefaultPhoto();
+            ui.postDelayed(this, DEFAULT_PHOTO_DELAY_MS);
         }
     };
 
@@ -77,6 +92,13 @@ public class MainActivity extends Activity {
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         vlp.gravity = Gravity.CENTER;
         root.addView(video, vlp);
+
+        defaultPhoto = new ImageView(this);
+        defaultPhoto.setBackgroundColor(Color.BLACK);
+        defaultPhoto.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        defaultPhoto.setVisibility(View.GONE);
+        root.addView(defaultPhoto, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
         albumView = new WebView(this);
         configureAlbumView();
@@ -165,21 +187,20 @@ public class MainActivity extends Activity {
                     showAlbum(albumUrl, "Loading shared photo link...");
                 }
             } else {
-                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
-                revealGear();
+                showDefaultPhotos();
             }
             return;
         }
 
         hideAlbum();
+        hideDefaultPhotos();
 
         if (mode == MODE_BUNDLED || TextUtils.isEmpty(url)) {
             File f = ensureLocalCopy();
             if (f != null) {
                 playFile(f);
             } else {
-                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
-                revealGear();
+                showDefaultPhotos();
             }
             return;
         }
@@ -193,6 +214,7 @@ public class MainActivity extends Activity {
 
     private void playFile(File f) {
         hideAlbum();
+        hideDefaultPhotos();
         video.setVideoURI(Uri.fromFile(f));
     }
 
@@ -222,6 +244,7 @@ public class MainActivity extends Activity {
     }
 
     private void showAlbum(String albumUrl, String loadingText) {
+        hideDefaultPhotos();
         video.stopPlayback();
         video.setVisibility(View.GONE);
         albumView.setVisibility(View.VISIBLE);
@@ -241,6 +264,61 @@ public class MainActivity extends Activity {
         }
         if (overlay != null) {
             overlay.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private void showDefaultPhotos() {
+        hideAlbum();
+        video.stopPlayback();
+        video.setVisibility(View.GONE);
+        defaultPhoto.setVisibility(View.VISIBLE);
+        overlay.setVisibility(View.VISIBLE);
+        hideStatus();
+        if (loadDefaultPhotoNames()) {
+            showNextDefaultPhoto();
+            ui.removeCallbacks(advanceDefaultPhoto);
+            ui.postDelayed(advanceDefaultPhoto, DEFAULT_PHOTO_DELAY_MS);
+        } else {
+            showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
+        }
+        revealGear();
+    }
+
+    private void hideDefaultPhotos() {
+        ui.removeCallbacks(advanceDefaultPhoto);
+        if (defaultPhoto != null) defaultPhoto.setVisibility(View.GONE);
+    }
+
+    private boolean loadDefaultPhotoNames() {
+        if (defaultPhotoNames != null) return defaultPhotoNames.length > 0;
+        try {
+            defaultPhotoNames = getAssets().list(DEFAULT_PHOTO_DIR);
+            if (defaultPhotoNames != null) Arrays.sort(defaultPhotoNames);
+            return defaultPhotoNames != null && defaultPhotoNames.length > 0;
+        } catch (Exception e) {
+            defaultPhotoNames = new String[0];
+            return false;
+        }
+    }
+
+    private void showNextDefaultPhoto() {
+        if (!loadDefaultPhotoNames()) return;
+        String name = defaultPhotoNames[defaultPhotoIndex % defaultPhotoNames.length];
+        defaultPhotoIndex++;
+        InputStream in = null;
+        try {
+            in = getAssets().open(DEFAULT_PHOTO_DIR + "/" + name);
+            Drawable drawable = Drawable.createFromStream(in, name);
+            if (drawable != null) {
+                defaultPhoto.setAlpha(0f);
+                defaultPhoto.setImageDrawable(drawable);
+                defaultPhoto.animate().alpha(1f).setDuration(600).start();
+            }
+        } catch (Exception ignored) {
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (Exception ignored) { }
         }
     }
 
@@ -331,6 +409,7 @@ public class MainActivity extends Activity {
         if (requestCode == REQ_SETTINGS && resultCode == RESULT_OK) {
             hideStatus();
             video.stopPlayback();
+            hideDefaultPhotos();
             loadAndPlay();
         }
     }
@@ -365,6 +444,10 @@ public class MainActivity extends Activity {
         super.onResume();
         hideSystemUi();
         if (albumView != null && albumView.getVisibility() == View.VISIBLE) albumView.onResume();
+        else if (defaultPhoto != null && defaultPhoto.getVisibility() == View.VISIBLE) {
+            ui.removeCallbacks(advanceDefaultPhoto);
+            ui.postDelayed(advanceDefaultPhoto, DEFAULT_PHOTO_DELAY_MS);
+        }
         else if (video != null && !video.isPlaying()) video.start();
     }
 
@@ -372,6 +455,7 @@ public class MainActivity extends Activity {
     protected void onPause() {
         super.onPause();
         if (albumView != null) albumView.onPause();
+        ui.removeCallbacks(advanceDefaultPhoto);
         if (video != null) video.pause();
     }
 

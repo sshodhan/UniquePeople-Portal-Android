@@ -3,6 +3,7 @@
 # No Gradle, no network. Uses only the local Android SDK + a JDK.
 set -e
 cd "$(dirname "$0")"
+ROOT="$(pwd)"
 PKG="com.portal.slideshow"
 echo "==> Portal Slideshow build"
 
@@ -47,14 +48,28 @@ done
 
 # ---- 4. Clean workspace ----------------------------------------------------
 OUT="build"
-rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex"
+rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/assets"
 
 # ---- 5. Compile + link resources (produces base APK with manifest+icon) ----
-# Bundle the local video unless INCLUDE_VIDEO=0 (use 0 to make a shareable copy
-# with NO personal video baked in -- users then add their own URL in Settings).
+# Bundle non-video assets in every build. Bundle the local video unless
+# INCLUDE_VIDEO=0 (use 0 to make a shareable copy without a personal video).
 ASSET_ARGS=""
+if [ -d app/src/main/assets ]; then
+  ( cd app/src/main/assets
+    find . -type f | while read -r asset; do
+      if [ "${INCLUDE_VIDEO:-1}" = "0" ] && [ "$asset" = "./slideshow.mp4" ]; then
+        continue
+      fi
+      dest="$ROOT/$OUT/assets/${asset#./}"
+      mkdir -p "$(dirname "$dest")"
+      cp "$asset" "$dest"
+    done
+  )
+fi
+if [ -n "$(find "$OUT/assets" -type f -print -quit)" ]; then
+  ASSET_ARGS="-A $OUT/assets"
+fi
 if [ "${INCLUDE_VIDEO:-1}" != "0" ] && [ -f app/src/main/assets/slideshow.mp4 ]; then
-  ASSET_ARGS="-A app/src/main/assets"
   echo "video:      bundled  (run 'INCLUDE_VIDEO=0 bash build.sh' for a shareable copy without it)"
 else
   echo "video:      NOT bundled (shareable build -- users set their own URL in Settings)"
