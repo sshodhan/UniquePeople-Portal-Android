@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
@@ -64,11 +65,11 @@ public class MainActivity extends Activity {
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable hideGear = new Runnable() {
         public void run() {
-            if (albumView != null && albumView.getVisibility() == View.VISIBLE) return;
-            if (defaultPhoto != null && defaultPhoto.getVisibility() == View.VISIBLE) return;
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
-            if (overlay != null) overlay.setVisibility(View.VISIBLE);
+            if (overlay != null) {
+                overlay.setVisibility(View.VISIBLE);
+            }
         }
     };
     private final Runnable advanceDefaultPhoto = new Runnable() {
@@ -98,8 +99,13 @@ public class MainActivity extends Activity {
         defaultPhoto.setBackgroundColor(Color.BLACK);
         defaultPhoto.setScaleType(ImageView.ScaleType.CENTER_CROP);
         defaultPhoto.setClickable(true);
-        defaultPhoto.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { revealGear(); }
+        defaultPhoto.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    revealGear();
+                }
+                return false;
+            }
         });
         defaultPhoto.setVisibility(View.GONE);
         root.addView(defaultPhoto, new FrameLayout.LayoutParams(
@@ -124,8 +130,13 @@ public class MainActivity extends Activity {
         // Transparent tap-catcher to reveal the settings button.
         overlay = new View(this);
         overlay.setClickable(true);
-        overlay.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { revealGear(); }
+        overlay.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    revealGear();
+                }
+                return true;
+            }
         });
         root.addView(overlay, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -174,6 +185,15 @@ public class MainActivity extends Activity {
         });
 
         loadAndPlay();
+    }
+
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_UP && controlsAreHidden()) {
+            revealGear();
+            return true;
+        }
+        return super.dispatchTouchEvent(event);
     }
 
     private void loadAndPlay() {
@@ -230,6 +250,14 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
+        albumView.setOnTouchListener(new View.OnTouchListener() {
+            public boolean onTouch(View v, MotionEvent event) {
+                if (event.getAction() == MotionEvent.ACTION_UP) {
+                    revealGear();
+                }
+                return false;
+            }
+        });
         albumView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
@@ -253,11 +281,9 @@ public class MainActivity extends Activity {
         video.stopPlayback();
         video.setVisibility(View.GONE);
         albumView.setVisibility(View.VISIBLE);
-        overlay.setVisibility(View.GONE);
-        gear.setVisibility(View.VISIBLE);
-        assistant.setVisibility(View.VISIBLE);
         showStatus(loadingText);
         albumView.loadUrl(albumUrl);
+        revealGear();
     }
 
     private void hideAlbum() {
@@ -396,6 +422,12 @@ public class MainActivity extends Activity {
         assistant.setVisibility(View.VISIBLE);
         ui.removeCallbacks(hideGear);
         ui.postDelayed(hideGear, 5000);
+    }
+
+    private boolean controlsAreHidden() {
+        boolean gearHidden = gear == null || gear.getVisibility() != View.VISIBLE;
+        boolean assistantHidden = assistant == null || assistant.getVisibility() != View.VISIBLE;
+        return gearHidden && assistantHidden;
     }
 
     private void openSettings() {
