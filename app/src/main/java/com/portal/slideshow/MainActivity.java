@@ -65,6 +65,7 @@ public class MainActivity extends Activity {
     private final Runnable hideGear = new Runnable() {
         public void run() {
             if (albumView != null && albumView.getVisibility() == View.VISIBLE) return;
+            if (defaultPhoto != null && defaultPhoto.getVisibility() == View.VISIBLE) return;
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
             if (overlay != null) overlay.setVisibility(View.VISIBLE);
@@ -96,6 +97,10 @@ public class MainActivity extends Activity {
         defaultPhoto = new ImageView(this);
         defaultPhoto.setBackgroundColor(Color.BLACK);
         defaultPhoto.setScaleType(ImageView.ScaleType.CENTER_CROP);
+        defaultPhoto.setClickable(true);
+        defaultPhoto.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { revealGear(); }
+        });
         defaultPhoto.setVisibility(View.GONE);
         root.addView(defaultPhoto, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
@@ -272,7 +277,6 @@ public class MainActivity extends Activity {
         video.stopPlayback();
         video.setVisibility(View.GONE);
         defaultPhoto.setVisibility(View.VISIBLE);
-        overlay.setVisibility(View.VISIBLE);
         hideStatus();
         if (loadDefaultPhotoNames()) {
             showNextDefaultPhoto();
@@ -281,6 +285,7 @@ public class MainActivity extends Activity {
         } else {
             showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
         }
+        overlay.setVisibility(View.GONE);
         revealGear();
     }
 

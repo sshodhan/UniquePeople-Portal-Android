@@ -48,9 +48,12 @@ public class SettingsActivity extends Activity {
         col.setPadding(pad, pad, pad, pad);
         scroll.addView(col);
 
-        col.addView(title("Portal Album Settings"));
-        col.addView(label("Paste a shared Google Photos or Google Drive link, or leave this blank to use the built-in default photos."));
+        col.addView(title("Portal Display Settings"));
+        col.addView(label("Choose what this Portal shows. Leave the shared photo link blank to use the built-in default photos."));
 
+        col.addView(sectionTitle("Photo Source"));
+        col.addView(fieldLabel("Shared Google Photos or Drive link"));
+        col.addView(help("Optional. Paste a public/shared album or folder link. This is the main way each user customizes the app without changing the APK."));
         albumUrlField = new EditText(this);
         albumUrlField.setHint("https://photos.app.goo.gl/... or https://drive.google.com/...");
         albumUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
@@ -59,33 +62,15 @@ public class SettingsActivity extends Activity {
         albumUrlField.setHintTextColor(Color.parseColor("#7A8090"));
         albumUrlField.setTextSize(18f);
         albumUrlField.setMinHeight(dp(64));
-        col.addView(albumUrlField, wide(dp(8)));
+        col.addView(albumUrlField, wide(dp(4)));
 
-        photoHostUrlField = new EditText(this);
-        photoHostUrlField.setHint(MainActivity.DEFAULT_PHOTO_HOST_URL);
-        photoHostUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        photoHostUrlField.setText(photoHostUrl);
-        photoHostUrlField.setTextColor(Color.WHITE);
-        photoHostUrlField.setHintTextColor(Color.parseColor("#7A8090"));
-        photoHostUrlField.setTextSize(18f);
-        photoHostUrlField.setMinHeight(dp(64));
-        col.addView(photoHostUrlField, wide(dp(8)));
-
-        urlField = new EditText(this);
-        urlField.setHint("https://example.com/family.mp4");
-        urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        urlField.setText(url);
-        urlField.setTextColor(Color.WHITE);
-        urlField.setHintTextColor(Color.parseColor("#7A8090"));
-        urlField.setTextSize(18f);
-        urlField.setMinHeight(dp(64));
-        col.addView(urlField, wide(dp(8)));
-
+        col.addView(sectionTitle("Display Mode"));
+        col.addView(help("Direct shared-link mode is best for most people. Use Photo Host only if you have a separate website that renders the album."));
         RadioGroup group = new RadioGroup(this);
         rGooglePhotos = radio("Open shared Google Photos or Drive link directly");
-        rPhotoHost = radio("Load through Photo Host viewer (optional website)");
-        rStream = radio("Stream from the internet (needs Wi-Fi each time)");
-        rDownload = radio("Download once, then play offline");
+        rPhotoHost = radio("Load through Photo Host viewer (advanced)");
+        rStream = radio("Stream a video URL");
+        rDownload = radio("Download a video once, then play offline");
         group.addView(rGooglePhotos);
         group.addView(rPhotoHost);
         group.addView(rStream);
@@ -94,7 +79,33 @@ public class SettingsActivity extends Activity {
             rBundled = radio("Use the built-in video");
             group.addView(rBundled);
         }
-        col.addView(group, wide(dp(16)));
+        col.addView(group, wide(dp(8)));
+
+        col.addView(sectionTitle("Advanced Website Viewer"));
+        col.addView(fieldLabel("Photo Host viewer URL"));
+        col.addView(help("Optional. Only used when Photo Host mode is selected. The app opens this URL with albumUrl=<your shared link>."));
+        photoHostUrlField = new EditText(this);
+        photoHostUrlField.setHint(MainActivity.DEFAULT_PHOTO_HOST_URL);
+        photoHostUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        photoHostUrlField.setText(photoHostUrl);
+        photoHostUrlField.setTextColor(Color.WHITE);
+        photoHostUrlField.setHintTextColor(Color.parseColor("#7A8090"));
+        photoHostUrlField.setTextSize(18f);
+        photoHostUrlField.setMinHeight(dp(64));
+        col.addView(photoHostUrlField, wide(dp(4)));
+
+        col.addView(sectionTitle("Video Fallback"));
+        col.addView(fieldLabel("Video URL"));
+        col.addView(help("Optional. Used only for Stream or Download video modes. Leave blank for photo modes and default photos."));
+        urlField = new EditText(this);
+        urlField.setHint("https://example.com/family.mp4");
+        urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        urlField.setText(url);
+        urlField.setTextColor(Color.WHITE);
+        urlField.setHintTextColor(Color.parseColor("#7A8090"));
+        urlField.setTextSize(18f);
+        urlField.setMinHeight(dp(64));
+        col.addView(urlField, wide(dp(4)));
 
         if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
         else if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
@@ -103,7 +114,8 @@ public class SettingsActivity extends Activity {
         else rStream.setChecked(true);
 
         col.addView(sectionTitle("Portal Assistant"));
-        col.addView(label("Assistant web app URL. This page should host the OpenAI Realtime voice assistant and keep API keys on its server."));
+        col.addView(fieldLabel("Assistant web app URL"));
+        col.addView(help("Optional. This should point to the browser assistant app. API keys stay on that server, not inside this Android APK."));
 
         assistantUrlField = new EditText(this);
         assistantUrlField.setHint(MainActivity.DEFAULT_ASSISTANT_URL);
@@ -113,7 +125,7 @@ public class SettingsActivity extends Activity {
         assistantUrlField.setHintTextColor(Color.parseColor("#7A8090"));
         assistantUrlField.setTextSize(18f);
         assistantUrlField.setMinHeight(dp(64));
-        col.addView(assistantUrlField, wide(dp(8)));
+        col.addView(assistantUrlField, wide(dp(4)));
 
         Button openAssistant = bigButton("Open Assistant", "#00796B");
         openAssistant.setOnClickListener(new View.OnClickListener() {
@@ -136,6 +148,7 @@ public class SettingsActivity extends Activity {
             public void onClick(View v) { finish(); }
         });
         col.addView(cancel, wide(dp(12)));
+        col.addView(spacer(dp(64)));
 
         setContentView(scroll);
     }
@@ -261,10 +274,28 @@ public class SettingsActivity extends Activity {
         return v;
     }
 
+    private TextView fieldLabel(String t) {
+        TextView v = new TextView(this);
+        v.setText(t);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(18f);
+        v.setPadding(0, dp(4), 0, dp(4));
+        return v;
+    }
+
+    private TextView help(String t) {
+        TextView v = new TextView(this);
+        v.setText(t);
+        v.setTextColor(Color.parseColor("#A7AFBF"));
+        v.setTextSize(14f);
+        v.setPadding(0, 0, 0, dp(6));
+        return v;
+    }
+
     private TextView sectionTitle(String t) {
         TextView v = title(t);
-        v.setTextSize(24f);
-        v.setPadding(0, dp(32), 0, dp(12));
+        v.setTextSize(21f);
+        v.setPadding(0, dp(18), 0, dp(6));
         return v;
     }
 
@@ -273,7 +304,7 @@ public class SettingsActivity extends Activity {
         r.setText(t);
         r.setTextColor(Color.WHITE);
         r.setTextSize(18f);
-        r.setMinHeight(dp(64));
+        r.setMinHeight(dp(56));
         r.setPadding(dp(8), 0, 0, 0);
         return r;
     }
@@ -285,8 +316,15 @@ public class SettingsActivity extends Activity {
         b.setAllCaps(false);
         b.setTextColor(Color.WHITE);
         b.setBackgroundColor(Color.parseColor(color));
-        b.setMinHeight(dp(72));
+        b.setMinHeight(dp(60));
         return b;
+    }
+
+    private View spacer(int height) {
+        View v = new View(this);
+        v.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, height));
+        return v;
     }
 
     private LinearLayout.LayoutParams wide(int topMargin) {
