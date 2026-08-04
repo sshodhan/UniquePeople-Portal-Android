@@ -41,7 +41,7 @@ public class MainActivity extends Activity {
     static final String KEY_PHOTO_HOST_URL = "photo_host_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
-    static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/HLFtGT4sZbh6DnjP9";
+    static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String DEFAULT_ASSISTANT_URL = "http://10.0.2.2:3000";
     static final String DEFAULT_PHOTO_HOST_URL = "http://10.0.2.2:3000/photo-host";
     static final int MODE_BUNDLED = 0;
