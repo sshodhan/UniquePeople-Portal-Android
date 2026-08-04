@@ -21,8 +21,9 @@ import android.widget.Toast;
 public class SettingsActivity extends Activity {
 
     private EditText urlField;
+    private EditText albumUrlField;
     private EditText assistantUrlField;
-    private RadioButton rStream, rDownload, rBundled;
+    private RadioButton rGooglePhotos, rStream, rDownload, rBundled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -31,8 +32,10 @@ public class SettingsActivity extends Activity {
 
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_URL, "");
+        String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, "");
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
-        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_BUNDLED);
+        int mode = p.getInt(MainActivity.KEY_MODE,
+                TextUtils.isEmpty(albumUrl) ? MainActivity.MODE_BUNDLED : MainActivity.MODE_GOOGLE_PHOTOS);
         boolean hasBundled = hasBundledVideo();
 
         ScrollView scroll = new ScrollView(this);
@@ -44,8 +47,18 @@ public class SettingsActivity extends Activity {
         col.setPadding(pad, pad, pad, pad);
         scroll.addView(col);
 
-        col.addView(title("Slideshow Settings"));
-        col.addView(label("Point this Portal at any video. Paste a direct link to an .mp4 file."));
+        col.addView(title("Portal Album Settings"));
+        col.addView(label("Paste a shared Google Photos album link so this Portal can become a reusable family photo frame."));
+
+        albumUrlField = new EditText(this);
+        albumUrlField.setHint("https://photos.app.goo.gl/...");
+        albumUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        albumUrlField.setText(albumUrl);
+        albumUrlField.setTextColor(Color.WHITE);
+        albumUrlField.setHintTextColor(Color.parseColor("#7A8090"));
+        albumUrlField.setTextSize(18f);
+        albumUrlField.setMinHeight(dp(64));
+        col.addView(albumUrlField, wide(dp(8)));
 
         urlField = new EditText(this);
         urlField.setHint("https://example.com/family.mp4");
@@ -58,8 +71,10 @@ public class SettingsActivity extends Activity {
         col.addView(urlField, wide(dp(8)));
 
         RadioGroup group = new RadioGroup(this);
+        rGooglePhotos = radio("Show a shared Google Photos album");
         rStream = radio("Stream from the internet (needs Wi-Fi each time)");
         rDownload = radio("Download once, then play offline");
+        group.addView(rGooglePhotos);
         group.addView(rStream);
         group.addView(rDownload);
         if (hasBundled) {
@@ -68,7 +83,8 @@ public class SettingsActivity extends Activity {
         }
         col.addView(group, wide(dp(16)));
 
-        if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
+        if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
+        else if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
         else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
         else rStream.setChecked(true);
 
@@ -116,16 +132,31 @@ public class SettingsActivity extends Activity {
             mode = MainActivity.MODE_BUNDLED;
         } else if (rDownload.isChecked()) {
             mode = MainActivity.MODE_DOWNLOAD;
+        } else if (rGooglePhotos.isChecked()) {
+            mode = MainActivity.MODE_GOOGLE_PHOTOS;
         } else {
             mode = MainActivity.MODE_STREAM;
         }
         String url = urlField.getText().toString().trim();
-        if (mode != MainActivity.MODE_BUNDLED && TextUtils.isEmpty(url)) {
-            Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
+        String albumUrl = albumUrlField.getText().toString().trim();
+        if (mode == MainActivity.MODE_GOOGLE_PHOTOS && TextUtils.isEmpty(albumUrl)) {
+            Toast.makeText(this, "Enter a shared Google Photos album link.", Toast.LENGTH_LONG).show();
             return;
         }
-        if (mode != MainActivity.MODE_BUNDLED
-                && !(url.startsWith("http://") || url.startsWith("https://"))) {
+        if (mode == MainActivity.MODE_GOOGLE_PHOTOS && !isValidWebUrl(albumUrl)) {
+            Toast.makeText(this, "Album link must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (mode != MainActivity.MODE_BUNDLED && TextUtils.isEmpty(url)) {
+            if (mode == MainActivity.MODE_GOOGLE_PHOTOS) {
+                url = "";
+            } else {
+            Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
+            return;
+            }
+        }
+        if (mode != MainActivity.MODE_BUNDLED && mode != MainActivity.MODE_GOOGLE_PHOTOS
+                && !isValidWebUrl(url)) {
             Toast.makeText(this, "URL must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;
         }
@@ -136,6 +167,7 @@ public class SettingsActivity extends Activity {
         }
         getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
                 .putString(MainActivity.KEY_URL, url)
+                .putString(MainActivity.KEY_ALBUM_URL, albumUrl)
                 .putInt(MainActivity.KEY_MODE, mode)
                 .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
                 .apply();
@@ -163,6 +195,10 @@ public class SettingsActivity extends Activity {
     }
 
     private boolean isValidAssistantUrl(String url) {
+        return isValidWebUrl(url);
+    }
+
+    private boolean isValidWebUrl(String url) {
         return url.startsWith("http://") || url.startsWith("https://");
     }
 

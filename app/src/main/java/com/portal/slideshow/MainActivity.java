@@ -17,6 +17,9 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.VideoView;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -29,22 +32,27 @@ public class MainActivity extends Activity {
 
     static final String PREFS = "slideshow_prefs";
     static final String KEY_URL = "video_url";
+    static final String KEY_ALBUM_URL = "album_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
     static final String DEFAULT_ASSISTANT_URL = "http://10.0.2.2:3000";
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
+    static final int MODE_GOOGLE_PHOTOS = 3;
     private static final String ASSET_NAME = "slideshow.mp4";
     private static final int REQ_SETTINGS = 100;
 
     private VideoView video;
+    private WebView albumView;
     private TextView status;
+    private View overlay;
     private Button gear;
     private Button assistant;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable hideGear = new Runnable() {
         public void run() {
+            if (albumView != null && albumView.getVisibility() == View.VISIBLE) return;
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
         }
@@ -65,6 +73,12 @@ public class MainActivity extends Activity {
         vlp.gravity = Gravity.CENTER;
         root.addView(video, vlp);
 
+        albumView = new WebView(this);
+        configureAlbumView();
+        albumView.setVisibility(View.GONE);
+        root.addView(albumView, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
         status = new TextView(this);
         status.setTextColor(Color.WHITE);
         status.setTextSize(20f);
@@ -76,7 +90,7 @@ public class MainActivity extends Activity {
         root.addView(status, slp);
 
         // Transparent tap-catcher to reveal the settings button.
-        View overlay = new View(this);
+        overlay = new View(this);
         overlay.setClickable(true);
         overlay.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { revealGear(); }
@@ -133,7 +147,23 @@ public class MainActivity extends Activity {
     private void loadAndPlay() {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String url = p.getString(KEY_URL, "");
-        int mode = p.getInt(KEY_MODE, hasBundledVideo() ? MODE_BUNDLED : MODE_STREAM);
+        String albumUrl = p.getString(KEY_ALBUM_URL, "");
+        int defaultMode = TextUtils.isEmpty(albumUrl)
+                ? (hasBundledVideo() ? MODE_BUNDLED : MODE_STREAM)
+                : MODE_GOOGLE_PHOTOS;
+        int mode = p.getInt(KEY_MODE, defaultMode);
+
+        if (mode == MODE_GOOGLE_PHOTOS) {
+            if (!TextUtils.isEmpty(albumUrl)) {
+                showAlbum(albumUrl);
+            } else {
+                showStatus("Welcome!\nTap the screen, then open Settings to add a Google Photos album link.");
+                revealGear();
+            }
+            return;
+        }
+
+        hideAlbum();
 
         if (mode == MODE_BUNDLED || TextUtils.isEmpty(url)) {
             File f = ensureLocalCopy();
@@ -154,7 +184,46 @@ public class MainActivity extends Activity {
     }
 
     private void playFile(File f) {
+        hideAlbum();
         video.setVideoURI(Uri.fromFile(f));
+    }
+
+    private void configureAlbumView() {
+        WebSettings settings = albumView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setDomStorageEnabled(true);
+        settings.setMediaPlaybackRequiresUserGesture(false);
+        settings.setLoadWithOverviewMode(true);
+        settings.setUseWideViewPort(true);
+        albumView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                hideStatus();
+            }
+        });
+    }
+
+    private void showAlbum(String albumUrl) {
+        video.stopPlayback();
+        video.setVisibility(View.GONE);
+        albumView.setVisibility(View.VISIBLE);
+        overlay.setVisibility(View.GONE);
+        gear.setVisibility(View.VISIBLE);
+        assistant.setVisibility(View.VISIBLE);
+        showStatus("Loading Google Photos album...");
+        albumView.loadUrl(albumUrl);
+    }
+
+    private void hideAlbum() {
+        if (albumView != null) {
+            albumView.setVisibility(View.GONE);
+        }
+        if (video != null) {
+            video.setVisibility(View.VISIBLE);
+        }
+        if (overlay != null) {
+            overlay.setVisibility(View.VISIBLE);
+        }
     }
 
     private void startDownload(final String url) {
@@ -276,12 +345,23 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         hideSystemUi();
-        if (video != null && !video.isPlaying()) video.start();
+        if (albumView != null && albumView.getVisibility() == View.VISIBLE) albumView.onResume();
+        else if (video != null && !video.isPlaying()) video.start();
     }
 
     @Override
     protected void onPause() {
         super.onPause();
+        if (albumView != null) albumView.onPause();
         if (video != null) video.pause();
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (albumView != null) {
+            albumView.destroy();
+            albumView = null;
+        }
+        super.onDestroy();
     }
 }
