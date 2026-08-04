@@ -36,8 +36,7 @@ public class SettingsActivity extends Activity {
         String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, "");
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
-        int mode = p.getInt(MainActivity.KEY_MODE,
-                TextUtils.isEmpty(albumUrl) ? MainActivity.MODE_BUNDLED : MainActivity.MODE_PHOTO_HOST);
+        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         boolean hasBundled = hasBundledVideo();
 
         ScrollView scroll = new ScrollView(this);
@@ -50,10 +49,10 @@ public class SettingsActivity extends Activity {
         scroll.addView(col);
 
         col.addView(title("Portal Album Settings"));
-        col.addView(label("Paste a shared Google Photos album link so this Portal can become a reusable family photo frame."));
+        col.addView(label("Paste a shared Google Photos or Google Drive link so this Portal can become a reusable photo frame without needing a separate website."));
 
         albumUrlField = new EditText(this);
-        albumUrlField.setHint("https://photos.app.goo.gl/...");
+        albumUrlField.setHint("https://photos.app.goo.gl/... or https://drive.google.com/...");
         albumUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
         albumUrlField.setText(albumUrl);
         albumUrlField.setTextColor(Color.WHITE);
@@ -83,12 +82,12 @@ public class SettingsActivity extends Activity {
         col.addView(urlField, wide(dp(8)));
 
         RadioGroup group = new RadioGroup(this);
-        rPhotoHost = radio("Load through Photo Host viewer");
-        rGooglePhotos = radio("Show a shared Google Photos album");
+        rGooglePhotos = radio("Open shared Google Photos or Drive link directly");
+        rPhotoHost = radio("Load through Photo Host viewer (optional website)");
         rStream = radio("Stream from the internet (needs Wi-Fi each time)");
         rDownload = radio("Download once, then play offline");
-        group.addView(rPhotoHost);
         group.addView(rGooglePhotos);
+        group.addView(rPhotoHost);
         group.addView(rStream);
         group.addView(rDownload);
         if (hasBundled) {
@@ -97,8 +96,8 @@ public class SettingsActivity extends Activity {
         }
         col.addView(group, wide(dp(16)));
 
-        if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
-        else if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
+        if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
+        else if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
         else if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
         else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
         else rStream.setChecked(true);
@@ -147,10 +146,10 @@ public class SettingsActivity extends Activity {
             mode = MainActivity.MODE_BUNDLED;
         } else if (rDownload.isChecked()) {
             mode = MainActivity.MODE_DOWNLOAD;
-        } else if (rPhotoHost.isChecked()) {
-            mode = MainActivity.MODE_PHOTO_HOST;
         } else if (rGooglePhotos.isChecked()) {
             mode = MainActivity.MODE_GOOGLE_PHOTOS;
+        } else if (rPhotoHost.isChecked()) {
+            mode = MainActivity.MODE_PHOTO_HOST;
         } else {
             mode = MainActivity.MODE_STREAM;
         }
@@ -159,7 +158,7 @@ public class SettingsActivity extends Activity {
         String photoHostUrl = normalizePhotoHostUrl();
         if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
                 && TextUtils.isEmpty(albumUrl)) {
-            Toast.makeText(this, "Enter a shared Google Photos album link.", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Enter a shared Google Photos or Drive link.", Toast.LENGTH_LONG).show();
             return;
         }
         if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)

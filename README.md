@@ -2,17 +2,17 @@
 
 Fullscreen Android photo-frame app for Meta Portal-style devices.
 
-## Shared Google Photos album mode
+## Shared Google Photos or Drive mode
 
-1. In Google Photos, open an album.
-2. Use **Share** and create/copy the shared album link.
+1. In Google Photos or Google Drive, open the album/folder you want to show.
+2. Use **Share** and create/copy the shared link.
 3. Install and launch this app.
-4. Tap the screen, open **Settings**, paste the shared album link, and choose **Load through Photo Host viewer**.
+4. Tap the screen, open **Settings**, paste the shared link, and choose **Open shared Google Photos or Drive link directly**.
 5. Save and play.
 
-The app sends the shared album URL to a configurable Photo Host viewer as `albumUrl=<encoded shared album URL>`, then loads that viewer fullscreen. No Google API key or Google account is embedded in the APK.
+The app opens the shared link directly in a fullscreen WebView. No separate website, Google API key, or Google account is embedded in the APK.
 
-You can also choose **Show a shared Google Photos album** to load the Google Photos page directly in the app.
+You can also choose **Load through Photo Host viewer** to send the shared album URL to a configurable website as `albumUrl=<encoded shared album URL>`. That website is optional and secondary.
 
 ## Video fallback
 

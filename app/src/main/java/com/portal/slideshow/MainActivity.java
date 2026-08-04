@@ -154,9 +154,7 @@ public class MainActivity extends Activity {
         String url = p.getString(KEY_URL, "");
         String albumUrl = p.getString(KEY_ALBUM_URL, "");
         String photoHostUrl = p.getString(KEY_PHOTO_HOST_URL, DEFAULT_PHOTO_HOST_URL);
-        int defaultMode = TextUtils.isEmpty(albumUrl)
-                ? (hasBundledVideo() ? MODE_BUNDLED : MODE_STREAM)
-                : MODE_PHOTO_HOST;
+        int defaultMode = MODE_GOOGLE_PHOTOS;
         int mode = p.getInt(KEY_MODE, defaultMode);
 
         if (mode == MODE_GOOGLE_PHOTOS || mode == MODE_PHOTO_HOST) {
@@ -164,10 +162,10 @@ public class MainActivity extends Activity {
                 if (mode == MODE_PHOTO_HOST) {
                     showAlbum(buildPhotoHostUrl(photoHostUrl, albumUrl), "Loading Photo Host...");
                 } else {
-                    showAlbum(albumUrl, "Loading Google Photos album...");
+                    showAlbum(albumUrl, "Loading shared photo link...");
                 }
             } else {
-                showStatus("Welcome!\nTap the screen, then open Settings to add a Google Photos album link.");
+                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
                 revealGear();
             }
             return;
@@ -180,7 +178,7 @@ public class MainActivity extends Activity {
             if (f != null) {
                 playFile(f);
             } else {
-                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos album link.");
+                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
                 revealGear();
             }
             return;
