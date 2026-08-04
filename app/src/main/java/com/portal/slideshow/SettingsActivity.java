@@ -29,11 +29,11 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("Slideshow Settings");
+        setTitle("UniquePeople Settings");
 
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_URL, "");
-        String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, "");
+        String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, MainActivity.DEFAULT_ALBUM_URL);
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
@@ -48,8 +48,8 @@ public class SettingsActivity extends Activity {
         col.setPadding(pad, pad, pad, pad);
         scroll.addView(col);
 
-        col.addView(title("Portal Display Settings"));
-        col.addView(label("Choose what this Portal shows. Leave the shared photo link blank to use the built-in default photos."));
+        col.addView(title("UniquePeople Display Settings"));
+        col.addView(label("Choose what UniquePeople shows. Leave the shared photo link blank to use the built-in default photos."));
 
         col.addView(sectionTitle("Photo Source"));
         col.addView(fieldLabel("Shared Google Photos or Drive link"));

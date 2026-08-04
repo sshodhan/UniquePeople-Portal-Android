@@ -41,6 +41,7 @@ public class MainActivity extends Activity {
     static final String KEY_PHOTO_HOST_URL = "photo_host_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
+    static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/HLFtGT4sZbh6DnjP9";
     static final String DEFAULT_ASSISTANT_URL = "http://10.0.2.2:3000";
     static final String DEFAULT_PHOTO_HOST_URL = "http://10.0.2.2:3000/photo-host";
     static final int MODE_BUNDLED = 0;
@@ -199,7 +200,7 @@ public class MainActivity extends Activity {
     private void loadAndPlay() {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String url = p.getString(KEY_URL, "");
-        String albumUrl = p.getString(KEY_ALBUM_URL, "");
+        String albumUrl = p.getString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL);
         String photoHostUrl = p.getString(KEY_PHOTO_HOST_URL, DEFAULT_PHOTO_HOST_URL);
         int defaultMode = MODE_GOOGLE_PHOTOS;
         int mode = p.getInt(KEY_MODE, defaultMode);
