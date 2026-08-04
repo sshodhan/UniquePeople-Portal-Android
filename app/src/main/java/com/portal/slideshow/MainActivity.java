@@ -77,6 +77,7 @@ public class MainActivity extends Activity {
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
             if (overlay != null) {
+                overlay.setClickable(true);
                 overlay.setVisibility(View.VISIBLE);
                 overlay.bringToFront();
             }
@@ -157,7 +158,8 @@ public class MainActivity extends Activity {
         gear.setVisibility(View.GONE);
         FrameLayout.LayoutParams glp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        glp.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        glp.gravity = Gravity.BOTTOM | Gravity.LEFT;
+        glp.leftMargin = 40;
         glp.bottomMargin = 40;
         gear.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { openSettings(); }
@@ -491,6 +493,7 @@ public class MainActivity extends Activity {
     }
 
     private void revealGear() {
+        overlay.setClickable(false);
         overlay.setVisibility(View.VISIBLE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);

@@ -89,15 +89,20 @@ echo "==> aapt2 link"
 # ---- 6. Compile Java -------------------------------------------------------
 echo "==> javac"
 SRcS="$(find app/src/main/java -name '*.java')"
+LIB_JARS="$(find app/libs -name '*.jar' 2>/dev/null | tr '\n' ':')"
+JAVAC_CP="$ANDROID_JAR"
+if [ -n "$LIB_JARS" ]; then
+  JAVAC_CP="$JAVAC_CP:$LIB_JARS"
+fi
 "$JDK_HOME/bin/javac" -source 8 -target 8 -nowarn \
-  -classpath "$ANDROID_JAR" \
+  -classpath "$JAVAC_CP" \
   -d "$OUT/classes" \
   $SRcS
 
 # ---- 7. Dex ----------------------------------------------------------------
 echo "==> d8"
 CLASSES="$(find "$OUT/classes" -name '*.class')"
-"$D8" --release --min-api 28 --lib "$ANDROID_JAR" --output "$OUT/dex" $CLASSES
+"$D8" --release --min-api 28 --lib "$ANDROID_JAR" --output "$OUT/dex" $CLASSES $(find app/libs -name '*.jar' 2>/dev/null)
 
 # ---- 8. Add classes.dex to the APK -----------------------------------------
 echo "==> package dex"
