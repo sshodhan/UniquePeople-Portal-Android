@@ -52,6 +52,8 @@ public class MainActivity extends Activity {
     private static final String ASSET_NAME = "slideshow.mp4";
     private static final String DEFAULT_PHOTO_DIR = "default_photos";
     private static final long DEFAULT_PHOTO_DELAY_MS = 8000;
+    private static final int ALBUM_INITIAL_SCALE_PERCENT = 125;
+    private static final float ALBUM_PAGE_ZOOM = 1.15f;
     private static final int REQ_SETTINGS = 100;
 
     private VideoView video;
@@ -63,6 +65,7 @@ public class MainActivity extends Activity {
     private Button assistant;
     private String[] defaultPhotoNames;
     private int defaultPhotoIndex;
+    private boolean albumZoomApplied;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable hideGear = new Runnable() {
         public void run() {
@@ -249,8 +252,12 @@ public class MainActivity extends Activity {
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setLoadWithOverviewMode(true);
+        settings.setLoadWithOverviewMode(false);
         settings.setUseWideViewPort(true);
+        settings.setSupportZoom(true);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
+        albumView.setInitialScale(ALBUM_INITIAL_SCALE_PERCENT);
         albumView.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_UP) {
@@ -263,8 +270,21 @@ public class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 hideStatus();
+                applyAlbumZoom(view);
             }
         });
+    }
+
+    private void applyAlbumZoom(final WebView view) {
+        if (albumZoomApplied) return;
+        albumZoomApplied = true;
+        view.postDelayed(new Runnable() {
+            public void run() {
+                if (albumView != null && albumView.getVisibility() == View.VISIBLE) {
+                    view.zoomBy(ALBUM_PAGE_ZOOM);
+                }
+            }
+        }, 500);
     }
 
     private String buildPhotoHostUrl(String photoHostUrl, String albumUrl) {
@@ -283,6 +303,8 @@ public class MainActivity extends Activity {
         video.setVisibility(View.GONE);
         albumView.setVisibility(View.VISIBLE);
         showStatus(loadingText);
+        albumZoomApplied = false;
+        albumView.setInitialScale(ALBUM_INITIAL_SCALE_PERCENT);
         albumView.loadUrl(albumUrl);
         revealGear();
     }
