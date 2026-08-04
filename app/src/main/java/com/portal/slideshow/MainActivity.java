@@ -55,6 +55,7 @@ public class MainActivity extends Activity {
             if (albumView != null && albumView.getVisibility() == View.VISIBLE) return;
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
+            if (overlay != null) overlay.setVisibility(View.VISIBLE);
         }
     };
 
@@ -170,7 +171,7 @@ public class MainActivity extends Activity {
             if (f != null) {
                 playFile(f);
             } else {
-                showStatus("Welcome!\nTap the screen, then open Settings to add a video URL.");
+                showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos album link.");
                 revealGear();
             }
             return;
@@ -290,6 +291,7 @@ public class MainActivity extends Activity {
     }
 
     private void revealGear() {
+        overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
         ui.removeCallbacks(hideGear);
