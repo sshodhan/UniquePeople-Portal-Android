@@ -77,9 +77,8 @@ public class MainActivity extends Activity {
             if (gear != null) gear.setVisibility(View.GONE);
             if (assistant != null) assistant.setVisibility(View.GONE);
             if (overlay != null) {
-                overlay.setClickable(true);
-                overlay.setVisibility(View.VISIBLE);
-                overlay.bringToFront();
+                overlay.setClickable(false);
+                overlay.setVisibility(View.GONE);
             }
         }
     };
@@ -138,17 +137,18 @@ public class MainActivity extends Activity {
         status.setVisibility(View.GONE);
         root.addView(status, slp);
 
-        // Transparent tap-catcher to reveal the settings button.
+        // Kept below controls for older modes; Google Photos must receive all album touches.
         overlay = new View(this);
-        overlay.setClickable(true);
+        overlay.setClickable(false);
         overlay.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_UP) {
                     revealGear();
                 }
-                return true;
+                return false;
             }
         });
+        overlay.setVisibility(View.GONE);
         root.addView(overlay, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
 
@@ -203,7 +203,6 @@ public class MainActivity extends Activity {
     public boolean dispatchTouchEvent(MotionEvent event) {
         if (event.getAction() == MotionEvent.ACTION_UP && controlsAreHidden()) {
             revealGear();
-            return true;
         }
         return super.dispatchTouchEvent(event);
     }
@@ -370,7 +369,8 @@ public class MainActivity extends Activity {
             video.setVisibility(View.VISIBLE);
         }
         if (overlay != null) {
-            overlay.setVisibility(View.VISIBLE);
+            overlay.setClickable(false);
+            overlay.setVisibility(View.GONE);
         }
     }
 
@@ -387,6 +387,7 @@ public class MainActivity extends Activity {
         } else {
             showStatus("Welcome!\nTap the screen, then open Settings to add a shared Google Photos or Drive link.");
         }
+        overlay.setClickable(false);
         overlay.setVisibility(View.GONE);
         revealGear();
     }
@@ -494,10 +495,9 @@ public class MainActivity extends Activity {
 
     private void revealGear() {
         overlay.setClickable(false);
-        overlay.setVisibility(View.VISIBLE);
+        overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
-        overlay.bringToFront();
         gear.bringToFront();
         assistant.bringToFront();
         ui.removeCallbacks(hideGear);
