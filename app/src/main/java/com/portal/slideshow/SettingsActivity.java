@@ -1,6 +1,7 @@
 package com.portal.slideshow;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.os.Bundle;
@@ -19,6 +20,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 public class SettingsActivity extends Activity {
+
+    private static final int REQ_QR_SCAN = 42;
 
     private EditText urlField;
     private EditText albumUrlField;
@@ -63,6 +66,14 @@ public class SettingsActivity extends Activity {
         albumUrlField.setTextSize(18f);
         albumUrlField.setMinHeight(dp(64));
         col.addView(albumUrlField, wide(dp(4)));
+
+        Button scanQr = bigButton("Scan QR code with Portal camera", "#00796B");
+        scanQr.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivityForResult(new Intent(SettingsActivity.this, QrScanActivity.class), REQ_QR_SCAN);
+            }
+        });
+        col.addView(scanQr, wide(dp(10)));
 
         col.addView(sectionTitle("Display Mode"));
         col.addView(help("Direct shared-link mode is best for most people. Use Photo Host only if you have a separate website that renders the album."));
@@ -151,6 +162,20 @@ public class SettingsActivity extends Activity {
         col.addView(spacer(dp(64)));
 
         setContentView(scroll);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
+            String albumUrl = data != null ? data.getStringExtra("album_url") : null;
+            if (TextUtils.isEmpty(albumUrl)) {
+                albumUrl = MainActivity.getAlbumUrl(getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE));
+            }
+            albumUrlField.setText(albumUrl);
+            rGooglePhotos.setChecked(true);
+            Toast.makeText(this, "QR link saved. Tap Save & Play to return to the slideshow.", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void save() {

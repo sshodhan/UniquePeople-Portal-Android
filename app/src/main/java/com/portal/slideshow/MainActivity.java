@@ -21,6 +21,9 @@ import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.VideoView;
 import android.webkit.WebSettings;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
@@ -67,6 +70,7 @@ public class MainActivity extends Activity {
     private String[] defaultPhotoNames;
     private int defaultPhotoIndex;
     private boolean albumZoomApplied;
+    private boolean albumLoadFailed;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Runnable hideGear = new Runnable() {
         public void run() {
@@ -74,6 +78,7 @@ public class MainActivity extends Activity {
             if (assistant != null) assistant.setVisibility(View.GONE);
             if (overlay != null) {
                 overlay.setVisibility(View.VISIBLE);
+                overlay.bringToFront();
             }
         }
     };
@@ -261,15 +266,36 @@ public class MainActivity extends Activity {
         albumView.setInitialScale(ALBUM_INITIAL_SCALE_PERCENT);
         albumView.setOnTouchListener(new View.OnTouchListener() {
             public boolean onTouch(View v, MotionEvent event) {
-                if (event.getAction() == MotionEvent.ACTION_UP) {
+                if (event.getAction() == MotionEvent.ACTION_UP && controlsAreHidden()) {
                     revealGear();
+                    return true;
                 }
                 return false;
             }
         });
         albumView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request == null || request.isForMainFrame()) {
+                    showAlbumSharingHelp();
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request == null || request.isForMainFrame()) {
+                    int code = errorResponse == null ? 0 : errorResponse.getStatusCode();
+                    if (code >= 400) showAlbumSharingHelp();
+                }
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
+                if (isSharingProblemUrl(url)) {
+                    showAlbumSharingHelp();
+                    return;
+                }
+                if (albumLoadFailed) return;
                 hideStatus();
                 applyAlbumZoom(view);
             }
@@ -305,9 +331,33 @@ public class MainActivity extends Activity {
         albumView.setVisibility(View.VISIBLE);
         showStatus(loadingText);
         albumZoomApplied = false;
+        albumLoadFailed = false;
         albumView.setInitialScale(ALBUM_INITIAL_SCALE_PERCENT);
         albumView.loadUrl(albumUrl);
         revealGear();
+    }
+
+    private void showAlbumSharingHelp() {
+        albumLoadFailed = true;
+        if (albumView != null) {
+            albumView.stopLoading();
+            albumView.setVisibility(View.GONE);
+        }
+        if (video != null) {
+            video.stopPlayback();
+            video.setVisibility(View.GONE);
+        }
+        hideDefaultPhotos();
+        showStatus("Album sharing needs an update\n\nOpen Google Photos, turn on shared-link access for this album, then tap Settings to paste or scan the updated link.");
+        revealGear();
+    }
+
+    private boolean isSharingProblemUrl(String url) {
+        if (url == null) return false;
+        String lower = url.toLowerCase();
+        return lower.contains("accounts.google.com")
+                || lower.contains("/signin")
+                || lower.contains("servicelogin");
     }
 
     private void hideAlbum() {
@@ -441,9 +491,12 @@ public class MainActivity extends Activity {
     }
 
     private void revealGear() {
-        overlay.setVisibility(View.GONE);
+        overlay.setVisibility(View.VISIBLE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
+        overlay.bringToFront();
+        gear.bringToFront();
+        assistant.bringToFront();
         ui.removeCallbacks(hideGear);
         ui.postDelayed(hideGear, 5000);
     }
