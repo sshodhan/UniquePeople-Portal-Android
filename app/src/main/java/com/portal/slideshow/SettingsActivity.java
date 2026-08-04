@@ -33,7 +33,7 @@ public class SettingsActivity extends Activity {
 
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_URL, "");
-        String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, MainActivity.DEFAULT_ALBUM_URL);
+        String albumUrl = MainActivity.getAlbumUrl(p);
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
