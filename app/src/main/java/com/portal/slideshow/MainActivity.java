@@ -26,6 +26,7 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.URLEncoder;
 import java.net.URL;
 
 public class MainActivity extends Activity {
@@ -33,13 +34,16 @@ public class MainActivity extends Activity {
     static final String PREFS = "slideshow_prefs";
     static final String KEY_URL = "video_url";
     static final String KEY_ALBUM_URL = "album_url";
+    static final String KEY_PHOTO_HOST_URL = "photo_host_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
     static final String DEFAULT_ASSISTANT_URL = "http://10.0.2.2:3000";
+    static final String DEFAULT_PHOTO_HOST_URL = "http://10.0.2.2:3000/photo-host";
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
     static final int MODE_GOOGLE_PHOTOS = 3;
+    static final int MODE_PHOTO_HOST = 4;
     private static final String ASSET_NAME = "slideshow.mp4";
     private static final int REQ_SETTINGS = 100;
 
@@ -149,14 +153,19 @@ public class MainActivity extends Activity {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String url = p.getString(KEY_URL, "");
         String albumUrl = p.getString(KEY_ALBUM_URL, "");
+        String photoHostUrl = p.getString(KEY_PHOTO_HOST_URL, DEFAULT_PHOTO_HOST_URL);
         int defaultMode = TextUtils.isEmpty(albumUrl)
                 ? (hasBundledVideo() ? MODE_BUNDLED : MODE_STREAM)
-                : MODE_GOOGLE_PHOTOS;
+                : MODE_PHOTO_HOST;
         int mode = p.getInt(KEY_MODE, defaultMode);
 
-        if (mode == MODE_GOOGLE_PHOTOS) {
+        if (mode == MODE_GOOGLE_PHOTOS || mode == MODE_PHOTO_HOST) {
             if (!TextUtils.isEmpty(albumUrl)) {
-                showAlbum(albumUrl);
+                if (mode == MODE_PHOTO_HOST) {
+                    showAlbum(buildPhotoHostUrl(photoHostUrl, albumUrl), "Loading Photo Host...");
+                } else {
+                    showAlbum(albumUrl, "Loading Google Photos album...");
+                }
             } else {
                 showStatus("Welcome!\nTap the screen, then open Settings to add a Google Photos album link.");
                 revealGear();
@@ -204,14 +213,24 @@ public class MainActivity extends Activity {
         });
     }
 
-    private void showAlbum(String albumUrl) {
+    private String buildPhotoHostUrl(String photoHostUrl, String albumUrl) {
+        String base = TextUtils.isEmpty(photoHostUrl) ? DEFAULT_PHOTO_HOST_URL : photoHostUrl;
+        String separator = base.contains("?") ? "&" : "?";
+        try {
+            return base + separator + "albumUrl=" + URLEncoder.encode(albumUrl, "UTF-8");
+        } catch (Exception e) {
+            return base + separator + "albumUrl=" + albumUrl;
+        }
+    }
+
+    private void showAlbum(String albumUrl, String loadingText) {
         video.stopPlayback();
         video.setVisibility(View.GONE);
         albumView.setVisibility(View.VISIBLE);
         overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
-        showStatus("Loading Google Photos album...");
+        showStatus(loadingText);
         albumView.loadUrl(albumUrl);
     }
 

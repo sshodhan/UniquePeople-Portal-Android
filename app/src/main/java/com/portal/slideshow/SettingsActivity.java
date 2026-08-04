@@ -22,8 +22,9 @@ public class SettingsActivity extends Activity {
 
     private EditText urlField;
     private EditText albumUrlField;
+    private EditText photoHostUrlField;
     private EditText assistantUrlField;
-    private RadioButton rGooglePhotos, rStream, rDownload, rBundled;
+    private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -33,9 +34,10 @@ public class SettingsActivity extends Activity {
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_URL, "");
         String albumUrl = p.getString(MainActivity.KEY_ALBUM_URL, "");
+        String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
         int mode = p.getInt(MainActivity.KEY_MODE,
-                TextUtils.isEmpty(albumUrl) ? MainActivity.MODE_BUNDLED : MainActivity.MODE_GOOGLE_PHOTOS);
+                TextUtils.isEmpty(albumUrl) ? MainActivity.MODE_BUNDLED : MainActivity.MODE_PHOTO_HOST);
         boolean hasBundled = hasBundledVideo();
 
         ScrollView scroll = new ScrollView(this);
@@ -60,6 +62,16 @@ public class SettingsActivity extends Activity {
         albumUrlField.setMinHeight(dp(64));
         col.addView(albumUrlField, wide(dp(8)));
 
+        photoHostUrlField = new EditText(this);
+        photoHostUrlField.setHint(MainActivity.DEFAULT_PHOTO_HOST_URL);
+        photoHostUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        photoHostUrlField.setText(photoHostUrl);
+        photoHostUrlField.setTextColor(Color.WHITE);
+        photoHostUrlField.setHintTextColor(Color.parseColor("#7A8090"));
+        photoHostUrlField.setTextSize(18f);
+        photoHostUrlField.setMinHeight(dp(64));
+        col.addView(photoHostUrlField, wide(dp(8)));
+
         urlField = new EditText(this);
         urlField.setHint("https://example.com/family.mp4");
         urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
@@ -71,9 +83,11 @@ public class SettingsActivity extends Activity {
         col.addView(urlField, wide(dp(8)));
 
         RadioGroup group = new RadioGroup(this);
+        rPhotoHost = radio("Load through Photo Host viewer");
         rGooglePhotos = radio("Show a shared Google Photos album");
         rStream = radio("Stream from the internet (needs Wi-Fi each time)");
         rDownload = radio("Download once, then play offline");
+        group.addView(rPhotoHost);
         group.addView(rGooglePhotos);
         group.addView(rStream);
         group.addView(rDownload);
@@ -83,7 +97,8 @@ public class SettingsActivity extends Activity {
         }
         col.addView(group, wide(dp(16)));
 
-        if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
+        if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
+        else if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
         else if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
         else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
         else rStream.setChecked(true);
@@ -132,6 +147,8 @@ public class SettingsActivity extends Activity {
             mode = MainActivity.MODE_BUNDLED;
         } else if (rDownload.isChecked()) {
             mode = MainActivity.MODE_DOWNLOAD;
+        } else if (rPhotoHost.isChecked()) {
+            mode = MainActivity.MODE_PHOTO_HOST;
         } else if (rGooglePhotos.isChecked()) {
             mode = MainActivity.MODE_GOOGLE_PHOTOS;
         } else {
@@ -139,23 +156,32 @@ public class SettingsActivity extends Activity {
         }
         String url = urlField.getText().toString().trim();
         String albumUrl = albumUrlField.getText().toString().trim();
-        if (mode == MainActivity.MODE_GOOGLE_PHOTOS && TextUtils.isEmpty(albumUrl)) {
+        String photoHostUrl = normalizePhotoHostUrl();
+        if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
+                && TextUtils.isEmpty(albumUrl)) {
             Toast.makeText(this, "Enter a shared Google Photos album link.", Toast.LENGTH_LONG).show();
             return;
         }
-        if (mode == MainActivity.MODE_GOOGLE_PHOTOS && !isValidWebUrl(albumUrl)) {
+        if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
+                && !isValidWebUrl(albumUrl)) {
             Toast.makeText(this, "Album link must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;
         }
+        if (mode == MainActivity.MODE_PHOTO_HOST && !isValidWebUrl(photoHostUrl)) {
+            Toast.makeText(this, "Photo Host URL must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return;
+        }
         if (mode != MainActivity.MODE_BUNDLED && TextUtils.isEmpty(url)) {
-            if (mode == MainActivity.MODE_GOOGLE_PHOTOS) {
+            if (mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST) {
                 url = "";
             } else {
-            Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
-            return;
+                Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
+                return;
             }
         }
-        if (mode != MainActivity.MODE_BUNDLED && mode != MainActivity.MODE_GOOGLE_PHOTOS
+        if (mode != MainActivity.MODE_BUNDLED
+                && mode != MainActivity.MODE_GOOGLE_PHOTOS
+                && mode != MainActivity.MODE_PHOTO_HOST
                 && !isValidWebUrl(url)) {
             Toast.makeText(this, "URL must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;
@@ -168,6 +194,7 @@ public class SettingsActivity extends Activity {
         getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
                 .putString(MainActivity.KEY_URL, url)
                 .putString(MainActivity.KEY_ALBUM_URL, albumUrl)
+                .putString(MainActivity.KEY_PHOTO_HOST_URL, photoHostUrl)
                 .putInt(MainActivity.KEY_MODE, mode)
                 .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
                 .apply();
@@ -192,6 +219,13 @@ public class SettingsActivity extends Activity {
         String assistantUrl = assistantUrlField.getText().toString().trim();
         if (TextUtils.isEmpty(assistantUrl)) return MainActivity.DEFAULT_ASSISTANT_URL;
         return assistantUrl;
+    }
+
+    private String normalizePhotoHostUrl() {
+        if (photoHostUrlField == null) return MainActivity.DEFAULT_PHOTO_HOST_URL;
+        String photoHostUrl = photoHostUrlField.getText().toString().trim();
+        if (TextUtils.isEmpty(photoHostUrl)) return MainActivity.DEFAULT_PHOTO_HOST_URL;
+        return photoHostUrl;
     }
 
     private boolean isValidAssistantUrl(String url) {
