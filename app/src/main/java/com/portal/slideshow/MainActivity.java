@@ -63,9 +63,9 @@ public class MainActivity extends Activity {
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
     static final String DEFAULT_CLOCK_COLOR = "#39FF14";
-    static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 16;
-    static final int MIN_CLOCK_TEXT_SIZE_SP = 14;
-    static final int MAX_CLOCK_TEXT_SIZE_SP = 36;
+    static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 42;
+    static final int MIN_CLOCK_TEXT_SIZE_SP = 24;
+    static final int MAX_CLOCK_TEXT_SIZE_SP = 72;
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -164,15 +164,15 @@ public class MainActivity extends Activity {
 
         clockChrome = new TextView(this);
         clockChrome.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        clockChrome.setGravity(Gravity.CENTER);
-        clockChrome.setShadowLayer(8f, 0f, 2f, Color.BLACK);
-        clockChrome.setBackgroundColor(Color.argb(118, 0, 0, 0));
-        clockChrome.setPadding(22, 12, 22, 12);
+        clockChrome.setGravity(Gravity.TOP | Gravity.LEFT);
+        clockChrome.setShadowLayer(12f, 0f, 3f, Color.BLACK);
+        clockChrome.setBackgroundColor(Color.argb(176, 0, 0, 0));
+        clockChrome.setIncludeFontPadding(false);
+        clockChrome.setLineSpacing(dp(10), 1.0f);
+        clockChrome.setPadding(dp(18), dp(48), dp(18), dp(18));
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                dp(360), FrameLayout.LayoutParams.MATCH_PARENT);
         clp.gravity = Gravity.TOP | Gravity.LEFT;
-        clp.leftMargin = 24;
-        clp.topMargin = 96;
         root.addView(clockChrome, clp);
         applyClockChromeSettings();
         refreshClockChrome();
@@ -555,8 +555,10 @@ public class MainActivity extends Activity {
         if (clockChrome == null) return;
         Date now = new Date();
         String time = new SimpleDateFormat("h:mm a", Locale.getDefault()).format(now);
-        String day = new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(now);
-        clockChrome.setText(time + "\n" + day);
+        String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(now);
+        String date = new SimpleDateFormat("MMM d", Locale.getDefault()).format(now);
+        String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(now);
+        clockChrome.setText(time + "\n" + day + "\n" + date + "\n" + year);
     }
 
     private void applyClockChromeSettings() {
@@ -564,6 +566,10 @@ public class MainActivity extends Activity {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String color = p.getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR);
         int size = p.getInt(KEY_CLOCK_TEXT_SIZE_SP, DEFAULT_CLOCK_TEXT_SIZE_SP);
+        if (size < DEFAULT_CLOCK_TEXT_SIZE_SP) {
+            size = DEFAULT_CLOCK_TEXT_SIZE_SP;
+            p.edit().putInt(KEY_CLOCK_TEXT_SIZE_SP, size).apply();
+        }
         if (size < MIN_CLOCK_TEXT_SIZE_SP) size = MIN_CLOCK_TEXT_SIZE_SP;
         if (size > MAX_CLOCK_TEXT_SIZE_SP) size = MAX_CLOCK_TEXT_SIZE_SP;
         try {
@@ -572,6 +578,10 @@ public class MainActivity extends Activity {
             clockChrome.setTextColor(Color.parseColor(DEFAULT_CLOCK_COLOR));
         }
         clockChrome.setTextSize(size);
+    }
+
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
     }
 
     private boolean controlsAreHidden() {

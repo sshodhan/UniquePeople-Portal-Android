@@ -259,7 +259,7 @@ public class SettingsActivity extends Activity {
 
     private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize) {
         col.addView(sectionTitle("Clock Display"));
-        col.addView(help("Shown in the top-left corner over the slideshow. Green is the classic digital-clock default and is easiest to see on most photos."));
+        col.addView(help("Shown as a classic left-side digital clock rail over the slideshow. Green is the default because it is easiest to read across the room."));
         col.addView(fieldLabel("Clock color"));
         RadioGroup clockColorGroup = new RadioGroup(this);
         rClockGreen = radio("Classic digital green");
@@ -277,7 +277,7 @@ public class SettingsActivity extends Activity {
         else rClockGreen.setChecked(true);
 
         col.addView(fieldLabel("Clock font size"));
-        col.addView(help("Use a number from 14 to 36. Larger sizes are easier to see across the room."));
+        col.addView(help("Use a number from 24 to 72. Larger sizes are easier to see across the room."));
         clockSizeField = new EditText(this);
         clockSizeField.setHint(String.valueOf(MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP));
         clockSizeField.setInputType(InputType.TYPE_CLASS_NUMBER);
@@ -383,7 +383,7 @@ public class SettingsActivity extends Activity {
         try {
             int size = Integer.parseInt(value);
             if (size < MainActivity.MIN_CLOCK_TEXT_SIZE_SP || size > MainActivity.MAX_CLOCK_TEXT_SIZE_SP) {
-                Toast.makeText(this, "Clock font size must be between 14 and 36.", Toast.LENGTH_LONG).show();
+                Toast.makeText(this, "Clock font size must be between 24 and 72.", Toast.LENGTH_LONG).show();
                 return -1;
             }
             return size;
