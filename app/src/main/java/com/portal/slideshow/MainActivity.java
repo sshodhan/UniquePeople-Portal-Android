@@ -1,6 +1,7 @@
 package com.portal.slideshow;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
@@ -10,6 +11,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.Settings;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -35,6 +37,10 @@ import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.Locale;
+import java.util.UUID;
+
+import org.json.JSONObject;
 
 public class MainActivity extends Activity {
 
@@ -44,10 +50,13 @@ public class MainActivity extends Activity {
     static final String KEY_PHOTO_HOST_URL = "photo_host_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
+    static final String KEY_DEVICE_ID = "device_id";
+    static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
+    static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String PREVIOUS_DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/HLFtGT4sZbh6DnjP9";
-    static final String DEFAULT_ASSISTANT_URL = "http://10.0.2.2:3000";
-    static final String DEFAULT_PHOTO_HOST_URL = "http://10.0.2.2:3000/photo-host";
+    static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
+    static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -196,7 +205,13 @@ public class MainActivity extends Activity {
             }
         });
 
-        loadAndPlay();
+        getOrCreateDeviceId(this);
+        showStatus("Checking device settings...");
+        refreshRemoteConfigAsync(this, new RemoteConfigCallback() {
+            public void onComplete(boolean success, String message) {
+                loadAndPlay();
+            }
+        });
     }
 
     @Override
@@ -575,6 +590,119 @@ public class MainActivity extends Activity {
             return DEFAULT_ALBUM_URL;
         }
         return albumUrl;
+    }
+
+    interface RemoteConfigCallback {
+        void onComplete(boolean success, String message);
+    }
+
+    static String getOrCreateDeviceId(Context context) {
+        SharedPreferences p = context.getSharedPreferences(PREFS, MODE_PRIVATE);
+        String existing = p.getString(KEY_DEVICE_ID, "");
+        if (!TextUtils.isEmpty(existing)) return existing;
+
+        String raw = "";
+        try {
+            raw = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+        } catch (Exception ignored) { }
+        if (TextUtils.isEmpty(raw)) raw = UUID.randomUUID().toString();
+
+        String compact = raw.replaceAll("[^A-Za-z0-9]", "").toUpperCase(Locale.US);
+        if (compact.length() > 12) compact = compact.substring(compact.length() - 12);
+        if (compact.length() < 6) compact = UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase(Locale.US);
+        String deviceId = "UP-" + compact;
+        p.edit().putString(KEY_DEVICE_ID, deviceId).apply();
+        return deviceId;
+    }
+
+    static String buildPairingUrl(Context context) {
+        String deviceId = getOrCreateDeviceId(context);
+        try {
+            return DEFAULT_SETTINGS_BASE_URL + "?deviceId=" + URLEncoder.encode(deviceId, "UTF-8");
+        } catch (Exception e) {
+            return DEFAULT_SETTINGS_BASE_URL + "?deviceId=" + deviceId;
+        }
+    }
+
+    static String buildRemoteConfigUrl(Context context) {
+        String deviceId = getOrCreateDeviceId(context);
+        try {
+            return DEFAULT_REMOTE_CONFIG_URL + "?deviceId=" + URLEncoder.encode(deviceId, "UTF-8");
+        } catch (Exception e) {
+            return DEFAULT_REMOTE_CONFIG_URL + "?deviceId=" + deviceId;
+        }
+    }
+
+    static void refreshRemoteConfigAsync(final Context context, final RemoteConfigCallback callback) {
+        final Context app = context.getApplicationContext();
+        final Handler main = new Handler(Looper.getMainLooper());
+        new Thread(new Runnable() {
+            public void run() {
+                boolean success = false;
+                String message = "Remote settings unavailable.";
+                try {
+                    HttpURLConnection c = (HttpURLConnection) new URL(buildRemoteConfigUrl(app)).openConnection();
+                    c.setConnectTimeout(10000);
+                    c.setReadTimeout(10000);
+                    c.setInstanceFollowRedirects(true);
+                    c.connect();
+                    int code = c.getResponseCode();
+                    InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                    String body = readText(in);
+                    if (code >= 400) throw new Exception("Remote config returned HTTP " + code);
+                    JSONObject root = new JSONObject(body);
+                    JSONObject config = root.optJSONObject("config");
+                    if (config == null) config = root;
+                    applyRemoteConfig(app.getSharedPreferences(PREFS, MODE_PRIVATE), config);
+                    success = true;
+                    message = "Remote settings refreshed.";
+                } catch (Exception e) {
+                    message = e.getMessage() == null ? message : e.getMessage();
+                }
+
+                final boolean done = success;
+                final String result = message;
+                main.post(new Runnable() {
+                    public void run() {
+                        if (callback != null) callback.onComplete(done, result);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private static void applyRemoteConfig(SharedPreferences p, JSONObject config) {
+        SharedPreferences.Editor editor = p.edit();
+        String albumUrl = config.optString("albumUrl", config.optString("defaultAlbumUrl", ""));
+        String photoHostUrl = config.optString("photoHostUrl", "");
+        String assistantUrl = config.optString("assistantUrl", "");
+        String mode = config.optString("mode", config.optString("defaultMode", ""));
+
+        if (isValidWebUrl(albumUrl)) editor.putString(KEY_ALBUM_URL, albumUrl);
+        if (isValidWebUrl(photoHostUrl)) editor.putString(KEY_PHOTO_HOST_URL, photoHostUrl);
+        if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);
+        if ("photo_host".equals(mode) || "photo-host".equals(mode)) {
+            editor.putInt(KEY_MODE, MODE_PHOTO_HOST);
+        } else if ("google_photos".equals(mode) || "google-photos".equals(mode)) {
+            editor.putInt(KEY_MODE, MODE_GOOGLE_PHOTOS);
+        }
+        editor.apply();
+    }
+
+    private static boolean isValidWebUrl(String url) {
+        return url != null && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private static String readText(InputStream in) throws Exception {
+        if (in == null) return "";
+        byte[] buffer = new byte[8192];
+        StringBuilder out = new StringBuilder();
+        int n;
+        while ((n = in.read(buffer)) > 0) {
+            out.append(new String(buffer, 0, n, "UTF-8"));
+        }
+        in.close();
+        return out.toString();
     }
 
     @Override

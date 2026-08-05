@@ -1,10 +1,17 @@
 package com.portal.slideshow;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
@@ -12,12 +19,18 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URLEncoder;
+import java.net.URL;
 
 public class SettingsActivity extends Activity {
 
@@ -27,7 +40,10 @@ public class SettingsActivity extends Activity {
     private EditText albumUrlField;
     private EditText photoHostUrlField;
     private EditText assistantUrlField;
+    private EditText pairingUrlField;
+    private ImageView pairingQr;
     private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
+    private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -53,6 +69,57 @@ public class SettingsActivity extends Activity {
 
         col.addView(title("UniquePeople Display Settings"));
         col.addView(label("Choose what UniquePeople shows. Leave the shared photo link blank to use the built-in default photos."));
+
+        final String deviceId = MainActivity.getOrCreateDeviceId(this);
+        final String pairingUrl = MainActivity.buildPairingUrl(this);
+        col.addView(sectionTitle("Pair This Portal"));
+        col.addView(fieldLabel("Portal device ID"));
+        col.addView(readOnlyValue(deviceId), wide(dp(4)));
+        col.addView(help("This ID is unique to this Portal. Scan the QR code with your phone to manage only this device."));
+
+        pairingQr = new ImageView(this);
+        pairingQr.setBackgroundColor(Color.WHITE);
+        pairingQr.setPadding(dp(10), dp(10), dp(10), dp(10));
+        pairingQr.setAdjustViewBounds(true);
+        col.addView(pairingQr, imageBox(dp(8)));
+        loadPairingQr(pairingUrl);
+
+        col.addView(fieldLabel("Phone setup link"));
+        pairingUrlField = readOnlyValue(pairingUrl);
+        col.addView(pairingUrlField, wide(dp(4)));
+
+        Button copyPairing = bigButton("Copy phone setup link", "#00796B");
+        copyPairing.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                clipboard.setPrimaryClip(ClipData.newPlainText("UniquePeople setup link", pairingUrl));
+                Toast.makeText(SettingsActivity.this, "Pairing link copied.", Toast.LENGTH_SHORT).show();
+            }
+        });
+        col.addView(copyPairing, wide(dp(8)));
+
+        Button openPairing = bigButton("Open setup page on this Portal", "#33394A");
+        openPairing.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pairingUrl)));
+            }
+        });
+        col.addView(openPairing, wide(dp(8)));
+
+        Button refreshRemote = bigButton("Refresh settings from web", "#2F6BFF");
+        refreshRemote.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                refreshRemote.setEnabled(false);
+                MainActivity.refreshRemoteConfigAsync(SettingsActivity.this, new MainActivity.RemoteConfigCallback() {
+                    public void onComplete(boolean success, String message) {
+                        refreshRemote.setEnabled(true);
+                        reloadFieldsFromPrefs();
+                        Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        });
+        col.addView(refreshRemote, wide(dp(12)));
 
         col.addView(sectionTitle("Photo Source"));
         col.addView(fieldLabel("Shared Google Photos or Drive link"));
@@ -162,6 +229,16 @@ public class SettingsActivity extends Activity {
         col.addView(spacer(dp(64)));
 
         setContentView(scroll);
+    }
+
+    private void reloadFieldsFromPrefs() {
+        SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
+        albumUrlField.setText(MainActivity.getAlbumUrl(p));
+        photoHostUrlField.setText(p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL));
+        assistantUrlField.setText(p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL));
+        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
+        if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
+        else rGooglePhotos.setChecked(true);
     }
 
     @Override
@@ -280,6 +357,31 @@ public class SettingsActivity extends Activity {
         return false;
     }
 
+    private void loadPairingQr(final String pairingUrl) {
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="
+                            + URLEncoder.encode(pairingUrl, "UTF-8");
+                    HttpURLConnection c = (HttpURLConnection) new URL(qrUrl).openConnection();
+                    c.setConnectTimeout(10000);
+                    c.setReadTimeout(10000);
+                    c.connect();
+                    InputStream in = c.getInputStream();
+                    final Bitmap bitmap = BitmapFactory.decodeStream(in);
+                    in.close();
+                    if (bitmap != null) {
+                        ui.post(new Runnable() {
+                            public void run() {
+                                pairingQr.setImageBitmap(bitmap);
+                            }
+                        });
+                    }
+                } catch (Exception ignored) { }
+            }
+        }).start();
+    }
+
     // ---- tiny view helpers ----
     private TextView title(String t) {
         TextView v = new TextView(this);
@@ -314,6 +416,20 @@ public class SettingsActivity extends Activity {
         v.setTextColor(Color.parseColor("#A7AFBF"));
         v.setTextSize(14f);
         v.setPadding(0, 0, 0, dp(6));
+        return v;
+    }
+
+    private EditText readOnlyValue(String t) {
+        EditText v = new EditText(this);
+        v.setText(t);
+        v.setTextColor(Color.WHITE);
+        v.setTextSize(16f);
+        v.setSingleLine(false);
+        v.setMinHeight(dp(58));
+        v.setPadding(dp(12), 0, dp(12), 0);
+        v.setFocusable(false);
+        v.setInputType(InputType.TYPE_NULL);
+        v.setBackgroundColor(Color.parseColor("#202638"));
         return v;
     }
 
@@ -356,6 +472,13 @@ public class SettingsActivity extends Activity {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.topMargin = topMargin;
+        return lp;
+    }
+
+    private LinearLayout.LayoutParams imageBox(int topMargin) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(260), dp(260));
+        lp.topMargin = topMargin;
+        lp.gravity = Gravity.LEFT;
         return lp;
     }
 
