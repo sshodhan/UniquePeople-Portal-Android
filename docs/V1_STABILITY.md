@@ -1,0 +1,200 @@
+# UniquePeople v1 Stability Notes
+
+UniquePeople v1 is live on one customer Portal. We should keep innovating, but it is our job to avoid breaking the installed v1. Treat the current behavior as a production compatibility contract. Future changes should preserve these guarantees unless we intentionally create a v2 migration plan.
+
+## Live v1 Snapshot
+
+- Android package: `com.portal.slideshow`
+- App name: `UniquePeople`
+- GitHub repo: `https://github.com/sshodhan/UniquePeople`
+- Web/config site: `https://uniquepeople-web.vercel.app`
+- Remote config endpoint: `https://uniquepeople-web.vercel.app/api/device-config`
+- Customer Portal tested device serial: `818PGA02P1206T05`
+- Customer Portal app device ID: `UP-DDA36346F304`
+- Known-good Android commit: `392ea76 Reduce clock overlay coverage`
+- APK path after build: `app-debug.apk`
+- Build command for shareable APKs: `INCLUDE_VIDEO=0 ./build.sh`
+
+## Must Not Break
+
+1. Preserve package name `com.portal.slideshow`.
+   Changing this creates a separate app install and will not preserve customer settings.
+
+2. Preserve local settings data on install.
+   Use `adb install -r app-debug.apk`. Do not uninstall or clear app data on a customer Portal unless explicitly approved.
+
+3. Preserve remote config fallback behavior.
+   The app must work if the Vercel site or network is unavailable. It should keep local settings and fall back to the default album URL when no remote config is available.
+
+4. Preserve Google Photos direct mode.
+   Google Photos must receive touch events. Do not add overlays or touch listeners that consume WebView taps, because that breaks album selection and slideshow controls.
+
+5. Preserve remote album override behavior.
+   A configured album URL from Vercel must be allowed even if it equals an older default URL. Do not reintroduce migration logic that rewrites valid remote album links.
+
+6. Preserve optional web/config behavior.
+   The app should first work independently from the website. The website is a configuration layer, not a hard dependency for display.
+
+7. Preserve readable but compact clock behavior.
+   The v1 clock should be a compact translucent panel, not a full-height black rail. It must avoid covering too much of the photo.
+
+## Current Defaults
+
+- Default album URL:
+  `https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA`
+- Default settings base URL:
+  `https://uniquepeople-web.vercel.app/settings`
+- Default assistant URL:
+  `https://uniquepeople-web.vercel.app/assistant`
+- Default photo host URL:
+  `https://uniquepeople-web.vercel.app/photo-host`
+- Default clock color:
+  `#39FF14`
+- Default clock font size:
+  `42sp`
+- Clock display format:
+
+```text
+time
+day
+month day
+year
+```
+
+Example:
+
+```text
+3:55 PM
+Wed
+Aug 5
+2026
+```
+
+## Rollback Checkpoints
+
+Keep these local rollback folders intact:
+
+- Original pre-test rollback:
+  `rollback-apks/2026-08-05-portal-818PGA02P1206T05-com.portal.slideshow/base.apk`
+- Known-good v1 checkpoint:
+  `rollback-apks/2026-08-05-known-good-clock-rail-852e285/app-debug.apk`
+
+The rollback folder is intentionally local and untracked. Do not delete it and do not commit APK backups to Git.
+
+## Customer Install Rules
+
+Before installing a new APK on a customer Portal:
+
+1. Verify the device is visible:
+
+```bash
+adb devices
+```
+
+2. Record the installed version:
+
+```bash
+adb -s <serial> shell dumpsys package com.portal.slideshow | rg 'versionCode|versionName|firstInstallTime|lastUpdateTime'
+```
+
+3. Save a rollback copy before install if one does not already exist for that device/build:
+
+```bash
+adb -s <serial> shell pm path com.portal.slideshow
+adb -s <serial> pull <device-apk-path> rollback-apks/<date-device-package>/base.apk
+```
+
+4. Install without clearing data:
+
+```bash
+adb -s <serial> install -r app-debug.apk
+```
+
+5. Launch:
+
+```bash
+adb -s <serial> shell am start -n com.portal.slideshow/.MainActivity
+```
+
+## Required Smoke Test
+
+Run this checklist before considering any build safe for customer use:
+
+- App launches without crash.
+- Existing customer album still loads.
+- Vercel per-device album change is picked up after app restart.
+- If Vercel is unavailable, app still displays a usable album/defaults.
+- Google Photos taps still work: slideshow/play controls, photo selection, and album UI must receive touches.
+- Settings and Assistant buttons are hidden during normal display and return on tap.
+- Clock is readable, compact, and does not create a large black band over the photo.
+- Clock settings still save color and font size.
+- QR scan button opens the camera or gives a clear failure path.
+- No OpenAI API key or private token is present in APK source, client HTML, or browser source.
+
+## Vercel Config Test
+
+To change the customer Portal album through the web config endpoint:
+
+```bash
+curl -sS -X POST https://uniquepeople-web.vercel.app/api/device-config \
+  -H 'content-type: application/json' \
+  --data '{
+    "deviceId": "UP-DDA36346F304",
+    "displayName": "Physical Portal",
+    "albumUrl": "https://photos.app.goo.gl/3oSoQUkNGCRtqMmE6",
+    "mode": "google_photos",
+    "photoHostUrl": "https://uniquepeople-web.vercel.app/photo-host",
+    "assistantUrl": "https://uniquepeople-web.vercel.app/assistant",
+    "slideDurationSeconds": 8,
+    "skipVideos": true,
+    "controlsAutoHideSeconds": 5
+  }'
+```
+
+Verify:
+
+```bash
+curl -sS 'https://uniquepeople-web.vercel.app/api/device-config?deviceId=UP-DDA36346F304'
+```
+
+Then restart the app and visually confirm the album changed.
+
+## Server-Side Changes That Are Safe for v1
+
+These changes can usually be made directly on the Vercel/web side without shipping a new APK, as long as the existing API response shape remains compatible:
+
+- Update a device's `albumUrl` to another shared Google Photos or Google Drive URL.
+- Update `displayName` for human-readable admin use.
+- Update `photoHostUrl` as long as Google Photos direct mode still works without it.
+- Update `assistantUrl` as long as the URL remains valid HTTPS and the Android Assistant button can open it.
+- Update `slideDurationSeconds`, `skipVideos`, and `controlsAutoHideSeconds` for future-compatible behavior. The v1 APK should ignore fields it does not use.
+- Add new optional JSON fields to `/api/device-config`. v1 should ignore unknown fields.
+- Improve `/settings`, `/assistant`, or `/photo-host` HTML/CSS/JS if existing routes keep loading.
+- Change OpenAI models, voices, prompts, or assistant server behavior behind the existing web endpoints, provided no client-side API key is exposed.
+- Add new per-device records for additional family Portals.
+- Add admin-only web UI around existing config data.
+
+Server-side changes that need extra caution or APK regression testing:
+
+- Renaming or removing `/api/device-config`.
+- Removing `config.albumUrl`, `config.mode`, `config.photoHostUrl`, or `config.assistantUrl` from the response.
+- Returning invalid JSON or changing the top-level `{ deviceId, storage, config }` shape.
+- Requiring authentication or cookies for the Android app's config fetch.
+- Redirecting config requests to a non-HTTPS URL.
+- Making the website required for normal photo display.
+- Removing existing routes `/settings`, `/assistant`, `/photo-host`, or `/config.json`.
+- Changing album URLs to private links that Google Photos cannot open without manual login.
+- Exposing `OPENAI_API_KEY`, Vercel Blob tokens, or other server secrets in client JS/HTML.
+
+## Safe Change Policy
+
+For v1 maintenance:
+
+- Innovation is welcome, but every new feature must keep the installed v1 path working.
+- New experiments should be additive, configurable, or easy to disable.
+- Prefer small, targeted patches.
+- Keep Android and web/config changes in separate commits when possible.
+- Build and test in emulator before customer Portal install.
+- Do not force-push after a build has been shared externally.
+- Do not change package name, signing approach, Vercel API shape, or default URLs without writing a migration note here.
+- Update this document whenever a new customer APK is installed or a new rollback checkpoint is created.
