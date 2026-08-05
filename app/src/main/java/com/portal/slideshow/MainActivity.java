@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -54,12 +55,18 @@ public class MainActivity extends Activity {
     static final String KEY_ASSISTANT_URL = "assistant_url";
     static final String KEY_DEVICE_ID = "device_id";
     static final String KEY_LAST_REMOTE_REFRESH_MS = "last_remote_refresh_ms";
+    static final String KEY_CLOCK_COLOR = "clock_color";
+    static final String KEY_CLOCK_TEXT_SIZE_SP = "clock_text_size_sp";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String PREVIOUS_DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/HLFtGT4sZbh6DnjP9";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
+    static final String DEFAULT_CLOCK_COLOR = "#39FF14";
+    static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 16;
+    static final int MIN_CLOCK_TEXT_SIZE_SP = 14;
+    static final int MAX_CLOCK_TEXT_SIZE_SP = 36;
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -157,17 +164,18 @@ public class MainActivity extends Activity {
         root.addView(status, slp);
 
         clockChrome = new TextView(this);
-        clockChrome.setTextColor(Color.WHITE);
-        clockChrome.setTextSize(17f);
+        clockChrome.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         clockChrome.setGravity(Gravity.CENTER);
         clockChrome.setShadowLayer(8f, 0f, 2f, Color.BLACK);
         clockChrome.setBackgroundColor(Color.argb(118, 0, 0, 0));
         clockChrome.setPadding(22, 12, 22, 12);
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        clp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        clp.topMargin = 24;
+        clp.gravity = Gravity.TOP | Gravity.LEFT;
+        clp.leftMargin = 24;
+        clp.topMargin = 96;
         root.addView(clockChrome, clp);
+        applyClockChromeSettings();
         refreshClockChrome();
         ui.postDelayed(updateClockChrome, 30000);
 
@@ -548,8 +556,23 @@ public class MainActivity extends Activity {
         if (clockChrome == null) return;
         Date now = new Date();
         String time = new SimpleDateFormat("h:mm a", Locale.getDefault()).format(now);
-        String day = new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(now);
+        String day = new SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(now);
         clockChrome.setText(time + "\n" + day);
+    }
+
+    private void applyClockChromeSettings() {
+        if (clockChrome == null) return;
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String color = p.getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR);
+        int size = p.getInt(KEY_CLOCK_TEXT_SIZE_SP, DEFAULT_CLOCK_TEXT_SIZE_SP);
+        if (size < MIN_CLOCK_TEXT_SIZE_SP) size = MIN_CLOCK_TEXT_SIZE_SP;
+        if (size > MAX_CLOCK_TEXT_SIZE_SP) size = MAX_CLOCK_TEXT_SIZE_SP;
+        try {
+            clockChrome.setTextColor(Color.parseColor(color));
+        } catch (Exception e) {
+            clockChrome.setTextColor(Color.parseColor(DEFAULT_CLOCK_COLOR));
+        }
+        clockChrome.setTextSize(size);
     }
 
     private boolean controlsAreHidden() {
@@ -608,6 +631,7 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         hideSystemUi();
+        applyClockChromeSettings();
         refreshClockChrome();
         ui.removeCallbacks(updateClockChrome);
         ui.postDelayed(updateClockChrome, 30000);

@@ -43,8 +43,10 @@ public class SettingsActivity extends Activity {
     private EditText photoHostUrlField;
     private EditText assistantUrlField;
     private EditText pairingUrlField;
+    private EditText clockSizeField;
     private ImageView pairingQr;
     private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
+    private RadioButton rClockGreen, rClockWhite, rClockAmber, rClockCyan;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
@@ -57,6 +59,8 @@ public class SettingsActivity extends Activity {
         String albumUrl = MainActivity.getAlbumUrl(p);
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
+        String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
+        int clockSize = p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         boolean hasBundled = hasBundledVideo();
 
@@ -71,6 +75,7 @@ public class SettingsActivity extends Activity {
 
         col.addView(title("UniquePeople Display Settings"));
         col.addView(label("Choose what UniquePeople shows. If the web settings site is unavailable, this Portal keeps using its saved settings, then falls back to the built-in defaults."));
+        addClockDisplaySettings(col, clockColor, clockSize);
 
         final String deviceId = MainActivity.getOrCreateDeviceId(this);
         final String pairingUrl = MainActivity.buildPairingUrl(this);
@@ -239,9 +244,49 @@ public class SettingsActivity extends Activity {
         albumUrlField.setText(MainActivity.getAlbumUrl(p));
         photoHostUrlField.setText(p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL));
         assistantUrlField.setText(p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL));
+        if (clockSizeField != null) {
+            clockSizeField.setText(String.valueOf(p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP)));
+        }
+        String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
+        if (rClockWhite != null && "#FFFFFF".equalsIgnoreCase(clockColor)) rClockWhite.setChecked(true);
+        else if (rClockAmber != null && "#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
+        else if (rClockCyan != null && "#00E5FF".equalsIgnoreCase(clockColor)) rClockCyan.setChecked(true);
+        else if (rClockGreen != null) rClockGreen.setChecked(true);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
         else rGooglePhotos.setChecked(true);
+    }
+
+    private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize) {
+        col.addView(sectionTitle("Clock Display"));
+        col.addView(help("Shown in the top-left corner over the slideshow. Green is the classic digital-clock default and is easiest to see on most photos."));
+        col.addView(fieldLabel("Clock color"));
+        RadioGroup clockColorGroup = new RadioGroup(this);
+        rClockGreen = radio("Classic digital green");
+        rClockWhite = radio("White");
+        rClockAmber = radio("Amber");
+        rClockCyan = radio("Cyan");
+        clockColorGroup.addView(rClockGreen);
+        clockColorGroup.addView(rClockWhite);
+        clockColorGroup.addView(rClockAmber);
+        clockColorGroup.addView(rClockCyan);
+        col.addView(clockColorGroup, wide(dp(4)));
+        if ("#FFFFFF".equalsIgnoreCase(clockColor)) rClockWhite.setChecked(true);
+        else if ("#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
+        else if ("#00E5FF".equalsIgnoreCase(clockColor)) rClockCyan.setChecked(true);
+        else rClockGreen.setChecked(true);
+
+        col.addView(fieldLabel("Clock font size"));
+        col.addView(help("Use a number from 14 to 36. Larger sizes are easier to see across the room."));
+        clockSizeField = new EditText(this);
+        clockSizeField.setHint(String.valueOf(MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP));
+        clockSizeField.setInputType(InputType.TYPE_CLASS_NUMBER);
+        clockSizeField.setText(String.valueOf(clockSize));
+        clockSizeField.setTextColor(Color.WHITE);
+        clockSizeField.setHintTextColor(Color.parseColor("#7A8090"));
+        clockSizeField.setTextSize(18f);
+        clockSizeField.setMinHeight(dp(64));
+        col.addView(clockSizeField, wide(dp(12)));
     }
 
     @Override
@@ -308,15 +353,44 @@ public class SettingsActivity extends Activity {
             Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;
         }
+        int clockSize = normalizeClockSize();
+        if (clockSize < 0) return;
+        String clockColor = selectedClockColor();
         getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
                 .putString(MainActivity.KEY_URL, url)
                 .putString(MainActivity.KEY_ALBUM_URL, albumUrl)
                 .putString(MainActivity.KEY_PHOTO_HOST_URL, photoHostUrl)
                 .putInt(MainActivity.KEY_MODE, mode)
                 .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
+                .putString(MainActivity.KEY_CLOCK_COLOR, clockColor)
+                .putInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, clockSize)
                 .apply();
         setResult(RESULT_OK);
         finish();
+    }
+
+    private String selectedClockColor() {
+        if (rClockWhite != null && rClockWhite.isChecked()) return "#FFFFFF";
+        if (rClockAmber != null && rClockAmber.isChecked()) return "#FFB000";
+        if (rClockCyan != null && rClockCyan.isChecked()) return "#00E5FF";
+        return MainActivity.DEFAULT_CLOCK_COLOR;
+    }
+
+    private int normalizeClockSize() {
+        if (clockSizeField == null) return MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP;
+        String value = clockSizeField.getText().toString().trim();
+        if (TextUtils.isEmpty(value)) return MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP;
+        try {
+            int size = Integer.parseInt(value);
+            if (size < MainActivity.MIN_CLOCK_TEXT_SIZE_SP || size > MainActivity.MAX_CLOCK_TEXT_SIZE_SP) {
+                Toast.makeText(this, "Clock font size must be between 14 and 36.", Toast.LENGTH_LONG).show();
+                return -1;
+            }
+            return size;
+        } catch (NumberFormatException e) {
+            Toast.makeText(this, "Clock font size must be a number.", Toast.LENGTH_LONG).show();
+            return -1;
+        }
     }
 
     private boolean saveAssistantUrl() {
