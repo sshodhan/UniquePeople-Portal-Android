@@ -36,7 +36,9 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.Locale;
 import java.util.UUID;
 
@@ -74,6 +76,7 @@ public class MainActivity extends Activity {
     private WebView albumView;
     private ImageView defaultPhoto;
     private TextView status;
+    private TextView clockChrome;
     private View overlay;
     private Button gear;
     private Button assistant;
@@ -97,6 +100,12 @@ public class MainActivity extends Activity {
             if (defaultPhoto == null || defaultPhoto.getVisibility() != View.VISIBLE) return;
             showNextDefaultPhoto();
             ui.postDelayed(this, DEFAULT_PHOTO_DELAY_MS);
+        }
+    };
+    private final Runnable updateClockChrome = new Runnable() {
+        public void run() {
+            refreshClockChrome();
+            ui.postDelayed(this, 30000);
         }
     };
 
@@ -146,6 +155,21 @@ public class MainActivity extends Activity {
         slp.gravity = Gravity.CENTER;
         status.setVisibility(View.GONE);
         root.addView(status, slp);
+
+        clockChrome = new TextView(this);
+        clockChrome.setTextColor(Color.WHITE);
+        clockChrome.setTextSize(17f);
+        clockChrome.setGravity(Gravity.CENTER);
+        clockChrome.setShadowLayer(8f, 0f, 2f, Color.BLACK);
+        clockChrome.setBackgroundColor(Color.argb(118, 0, 0, 0));
+        clockChrome.setPadding(22, 12, 22, 12);
+        FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        clp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+        clp.topMargin = 24;
+        root.addView(clockChrome, clp);
+        refreshClockChrome();
+        ui.postDelayed(updateClockChrome, 30000);
 
         // Kept below controls for older modes; Google Photos must receive all album touches.
         overlay = new View(this);
@@ -514,10 +538,19 @@ public class MainActivity extends Activity {
         overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
+        if (clockChrome != null) clockChrome.bringToFront();
         gear.bringToFront();
         assistant.bringToFront();
         ui.removeCallbacks(hideGear);
         ui.postDelayed(hideGear, 5000);
+    }
+
+    private void refreshClockChrome() {
+        if (clockChrome == null) return;
+        Date now = new Date();
+        String time = new SimpleDateFormat("h:mm a", Locale.getDefault()).format(now);
+        String day = new SimpleDateFormat("EEEE, MMM d", Locale.getDefault()).format(now);
+        clockChrome.setText(time + "\n" + day);
     }
 
     private boolean controlsAreHidden() {
@@ -576,6 +609,9 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         hideSystemUi();
+        refreshClockChrome();
+        ui.removeCallbacks(updateClockChrome);
+        ui.postDelayed(updateClockChrome, 30000);
         if (albumView != null && albumView.getVisibility() == View.VISIBLE) albumView.onResume();
         else if (defaultPhoto != null && defaultPhoto.getVisibility() == View.VISIBLE) {
             ui.removeCallbacks(advanceDefaultPhoto);
@@ -712,6 +748,7 @@ public class MainActivity extends Activity {
         super.onPause();
         if (albumView != null) albumView.onPause();
         ui.removeCallbacks(advanceDefaultPhoto);
+        ui.removeCallbacks(updateClockChrome);
         if (video != null) video.pause();
     }
 
