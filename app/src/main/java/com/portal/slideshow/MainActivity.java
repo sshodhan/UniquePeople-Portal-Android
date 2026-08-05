@@ -166,13 +166,15 @@ public class MainActivity extends Activity {
         clockChrome.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         clockChrome.setGravity(Gravity.TOP | Gravity.LEFT);
         clockChrome.setShadowLayer(12f, 0f, 3f, Color.BLACK);
-        clockChrome.setBackgroundColor(Color.argb(176, 0, 0, 0));
+        clockChrome.setBackgroundColor(Color.argb(132, 0, 0, 0));
         clockChrome.setIncludeFontPadding(false);
-        clockChrome.setLineSpacing(dp(10), 1.0f);
-        clockChrome.setPadding(dp(18), dp(48), dp(18), dp(18));
+        clockChrome.setLineSpacing(dp(8), 1.0f);
+        clockChrome.setPadding(dp(14), dp(12), dp(14), dp(12));
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
-                dp(360), FrameLayout.LayoutParams.MATCH_PARENT);
+                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         clp.gravity = Gravity.TOP | Gravity.LEFT;
+        clp.leftMargin = dp(18);
+        clp.topMargin = dp(58);
         root.addView(clockChrome, clp);
         applyClockChromeSettings();
         refreshClockChrome();
