@@ -309,7 +309,6 @@ public class MainActivity extends Activity {
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_UP && controlsAreHidden()) {
                     revealGear();
-                    return true;
                 }
                 return false;
             }
@@ -612,6 +611,10 @@ public class MainActivity extends Activity {
         refreshClockChrome();
         ui.removeCallbacks(updateClockChrome);
         ui.postDelayed(updateClockChrome, 30000);
+        if (!controlsAreHidden()) {
+            ui.removeCallbacks(hideGear);
+            ui.postDelayed(hideGear, 5000);
+        }
         if (albumView != null && albumView.getVisibility() == View.VISIBLE) albumView.onResume();
         else if (defaultPhoto != null && defaultPhoto.getVisibility() == View.VISIBLE) {
             ui.removeCallbacks(advanceDefaultPhoto);
