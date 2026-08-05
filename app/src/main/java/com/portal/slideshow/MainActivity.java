@@ -51,6 +51,7 @@ public class MainActivity extends Activity {
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
     static final String KEY_DEVICE_ID = "device_id";
+    static final String KEY_LAST_REMOTE_REFRESH_MS = "last_remote_refresh_ms";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
@@ -206,10 +207,10 @@ public class MainActivity extends Activity {
         });
 
         getOrCreateDeviceId(this);
-        showStatus("Checking device settings...");
+        loadAndPlay();
         refreshRemoteConfigAsync(this, new RemoteConfigCallback() {
             public void onComplete(boolean success, String message) {
-                loadAndPlay();
+                if (success) loadAndPlay();
             }
         });
     }
@@ -642,8 +643,8 @@ public class MainActivity extends Activity {
                 String message = "Remote settings unavailable.";
                 try {
                     HttpURLConnection c = (HttpURLConnection) new URL(buildRemoteConfigUrl(app)).openConnection();
-                    c.setConnectTimeout(10000);
-                    c.setReadTimeout(10000);
+                    c.setConnectTimeout(3500);
+                    c.setReadTimeout(3500);
                     c.setInstanceFollowRedirects(true);
                     c.connect();
                     int code = c.getResponseCode();
@@ -686,6 +687,7 @@ public class MainActivity extends Activity {
         } else if ("google_photos".equals(mode) || "google-photos".equals(mode)) {
             editor.putInt(KEY_MODE, MODE_GOOGLE_PHOTOS);
         }
+        editor.putLong(KEY_LAST_REMOTE_REFRESH_MS, System.currentTimeMillis());
         editor.apply();
     }
 

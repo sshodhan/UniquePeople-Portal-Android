@@ -31,6 +31,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URLEncoder;
 import java.net.URL;
+import java.text.DateFormat;
+import java.util.Date;
 
 public class SettingsActivity extends Activity {
 
@@ -68,14 +70,15 @@ public class SettingsActivity extends Activity {
         scroll.addView(col);
 
         col.addView(title("UniquePeople Display Settings"));
-        col.addView(label("Choose what UniquePeople shows. Leave the shared photo link blank to use the built-in default photos."));
+        col.addView(label("Choose what UniquePeople shows. If the web settings site is unavailable, this Portal keeps using its saved settings, then falls back to the built-in defaults."));
 
         final String deviceId = MainActivity.getOrCreateDeviceId(this);
         final String pairingUrl = MainActivity.buildPairingUrl(this);
         col.addView(sectionTitle("Pair This Portal"));
         col.addView(fieldLabel("Portal device ID"));
         col.addView(readOnlyValue(deviceId), wide(dp(4)));
-        col.addView(help("This ID is unique to this Portal. Scan the QR code with your phone to manage only this device."));
+        col.addView(help("This ID is unique to this Portal. Scan the QR code with your phone to manage only this device. The Portal does not need the website to start; it only uses the website to update settings."));
+        col.addView(help(lastRemoteRefreshText(p)));
 
         pairingQr = new ImageView(this);
         pairingQr.setBackgroundColor(Color.WHITE);
@@ -355,6 +358,12 @@ public class SettingsActivity extends Activity {
             for (String n : getAssets().list("")) if ("slideshow.mp4".equals(n)) return true;
         } catch (Exception ignored) { }
         return false;
+    }
+
+    private String lastRemoteRefreshText(SharedPreferences p) {
+        long last = p.getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0);
+        if (last <= 0) return "Remote settings have not synced yet. Local defaults are ready.";
+        return "Last web settings sync: " + DateFormat.getDateTimeInstance().format(new Date(last));
     }
 
     private void loadPairingQr(final String pairingUrl) {
