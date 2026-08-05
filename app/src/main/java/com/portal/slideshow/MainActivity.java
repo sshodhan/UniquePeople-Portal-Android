@@ -60,7 +60,6 @@ public class MainActivity extends Activity {
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
-    static final String PREVIOUS_DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/HLFtGT4sZbh6DnjP9";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
     static final String DEFAULT_CLOCK_COLOR = "#39FF14";
@@ -648,12 +647,7 @@ public class MainActivity extends Activity {
     }
 
     static String getAlbumUrl(SharedPreferences p) {
-        String albumUrl = p.getString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL);
-        if (PREVIOUS_DEFAULT_ALBUM_URL.equals(albumUrl)) {
-            p.edit().putString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL).apply();
-            return DEFAULT_ALBUM_URL;
-        }
-        return albumUrl;
+        return p.getString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL);
     }
 
     interface RemoteConfigCallback {
