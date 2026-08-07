@@ -14,6 +14,8 @@ UniquePeople v1 is live on one customer Portal. We should keep innovating, but i
 - Known-good Android commit: `392ea76 Reduce clock overlay coverage`
 - APK path after build: `app-debug.apk`
 - Build command for shareable APKs: `INCLUDE_VIDEO=0 ./build.sh`
+- Release-signed APK path after build: `app-release.apk`
+- Release-signed build command: `INCLUDE_VIDEO=0 UNIQUEPEOPLE_RELEASE=1 ./build.sh`
 
 ## V2 Rollout Note
 
@@ -25,6 +27,17 @@ V2 is an intentional in-place upgrade for additional family Portal devices, not 
 - V2 install rule: save the currently installed APK first, then use `adb install -r app-debug.apk`
 - V2 rollback rule: if rollback is needed, reinstall the preserved APK for that exact Portal. If Android blocks downgrade from V2 to V1, stop and explain options before clearing data or uninstalling.
 - V2 tile rail: optional local display settings for Clock, Daily greeting, Weather, Stocks, and Birthday reminders. Clock defaults on. Other tiles default off until data sources are configured. These settings must not change V1 web API fields or make album display depend on tile data.
+
+## V3 Release-Signed Distribution Note
+
+V3 starts Option B: the release-signed distribution line for family APK sharing and future in-app update prompts. It keeps the same package name and preference keys, but it intentionally changes the signing strategy for new distribution builds.
+
+- V3 Android versionCode: `3`
+- V3 Android versionName: `3.0`
+- V3 signing rule: release APKs must be built with `UNIQUEPEOPLE_RELEASE=1` and the stable UniquePeople release keystore documented in [RELEASE_SIGNING.md](RELEASE_SIGNING.md).
+- V3 debug rule: `./build.sh` may still create `app-debug.apk` for local testing, but family/customer distribution should use release-signed `app-release.apk`.
+- Important migration rule: debug-signed V1/V2 installs cannot update directly to release-signed V3. If Android blocks install because signatures differ, stop and decide whether to do a planned uninstall/reinstall. Do not clear data or uninstall without explicit approval.
+- V3 rollback rule: preserve the exact pre-migration APK before attempting release-signed V3. If rollback is needed after a release-signed install, reinstall a release-signed rollback from the same release keystore, or stop before any destructive action.
 
 ## Must Not Break
 

@@ -34,6 +34,18 @@ The original video modes are still available:
 
 The debug APK is written to `app-debug.apk`.
 
+## Release-signed builds
+
+V3 starts the release-signed distribution line for family installs and future hosted APK updates. Create and preserve the release keystore using [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), then build:
+
+```bash
+INCLUDE_VIDEO=0 UNIQUEPEOPLE_RELEASE=1 ./build.sh
+```
+
+The release APK is written to `app-release.apk`.
+
+Existing debug-signed V1/V2 installs cannot update directly to release-signed V3. Treat that as a planned one-time migration and preserve a rollback APK before attempting it.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).

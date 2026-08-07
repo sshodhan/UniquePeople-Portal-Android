@@ -113,26 +113,52 @@ cp "$OUT/base.apk" "$OUT/unsigned.apk"
 echo "==> zipalign"
 "$ZIPALIGN" -f 4 "$OUT/unsigned.apk" "$OUT/aligned.apk"
 
-# ---- 10. Debug keystore + sign --------------------------------------------
-KS="$HOME/.android/debug.keystore"
-if [ ! -f "$KS" ]; then
-  echo "==> creating debug keystore"
-  mkdir -p "$HOME/.android"
-  "$JDK_HOME/bin/keytool" -genkeypair -v -keystore "$KS" \
-    -alias androiddebugkey -storepass android -keypass android \
-    -keyalg RSA -keysize 2048 -validity 10000 \
-    -dname "CN=Android Debug,O=Android,C=US"
+# ---- 10. Sign --------------------------------------------------------------
+if [ "${UNIQUEPEOPLE_RELEASE:-0}" = "1" ]; then
+  OUT_APK="app-release.apk"
+  KS="${UNIQUEPEOPLE_KEYSTORE:-}"
+  KS_ALIAS="${UNIQUEPEOPLE_KEY_ALIAS:-uniquepeople}"
+  if [ -z "$KS" ] || [ ! -f "$KS" ]; then
+    echo "ERROR: UNIQUEPEOPLE_KEYSTORE must point to the release .jks file."
+    exit 1
+  fi
+  if [ -z "${UNIQUEPEOPLE_KEYSTORE_PASSWORD:-}" ]; then
+    echo "ERROR: UNIQUEPEOPLE_KEYSTORE_PASSWORD must be set for release signing."
+    exit 1
+  fi
+  if [ -z "${UNIQUEPEOPLE_KEY_PASSWORD:-}" ]; then
+    echo "ERROR: UNIQUEPEOPLE_KEY_PASSWORD must be set for release signing."
+    exit 1
+  fi
+  echo "signing:    release ($KS_ALIAS)"
+  echo "==> apksigner"
+  "$APKSIGNER" sign \
+    --ks "$KS" --ks-pass env:UNIQUEPEOPLE_KEYSTORE_PASSWORD --key-pass env:UNIQUEPEOPLE_KEY_PASSWORD \
+    --ks-key-alias "$KS_ALIAS" \
+    --out "$OUT_APK" "$OUT/aligned.apk"
+else
+  OUT_APK="app-debug.apk"
+  KS="$HOME/.android/debug.keystore"
+  if [ ! -f "$KS" ]; then
+    echo "==> creating debug keystore"
+    mkdir -p "$HOME/.android"
+    "$JDK_HOME/bin/keytool" -genkeypair -v -keystore "$KS" \
+      -alias androiddebugkey -storepass android -keypass android \
+      -keyalg RSA -keysize 2048 -validity 10000 \
+      -dname "CN=Android Debug,O=Android,C=US"
+  fi
+  echo "signing:    debug"
+  echo "==> apksigner"
+  "$APKSIGNER" sign \
+    --ks "$KS" --ks-pass pass:android --key-pass pass:android \
+    --ks-key-alias androiddebugkey \
+    --out "$OUT_APK" "$OUT/aligned.apk"
 fi
-echo "==> apksigner"
-"$APKSIGNER" sign \
-  --ks "$KS" --ks-pass pass:android --key-pass pass:android \
-  --ks-key-alias androiddebugkey \
-  --out app-debug.apk "$OUT/aligned.apk"
 
 echo ""
 echo "================================================================"
-echo " BUILD OK ->  $(pwd)/app-debug.apk"
+echo " BUILD OK ->  $(pwd)/$OUT_APK"
 echo "================================================================"
 echo "Install + launch on the Portal:"
-echo "  hzdb app install -r app-debug.apk"
+echo "  hzdb app install -r $OUT_APK"
 echo "  hzdb app launch $PKG"
