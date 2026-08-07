@@ -14,7 +14,10 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.RelativeSizeSpan;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -43,8 +46,10 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.Locale;
+import java.util.TimeZone;
 import java.util.UUID;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class MainActivity extends Activity {
@@ -65,8 +70,12 @@ public class MainActivity extends Activity {
     static final String KEY_TILE_STOCKS_ENABLED = "tile_stocks_enabled";
     static final String KEY_TILE_GREETING_ENABLED = "tile_greeting_enabled";
     static final String KEY_TILE_BIRTHDAYS_ENABLED = "tile_birthdays_enabled";
+    static final String KEY_WEATHER_TILE_TEXT = "weather_tile_text";
+    static final String KEY_STOCKS_TILE_TEXT = "stocks_tile_text";
+    static final String KEY_LAST_DASHBOARD_REFRESH_MS = "last_dashboard_refresh_ms";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
+    static final String DEFAULT_DASHBOARD_DATA_URL = "https://uniquepeople-web.vercel.app/api/dashboard-data";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
@@ -74,6 +83,7 @@ public class MainActivity extends Activity {
     static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 42;
     static final int MIN_CLOCK_TEXT_SIZE_SP = 24;
     static final int MAX_CLOCK_TEXT_SIZE_SP = 72;
+    static final int TILE_RAIL_WIDTH_DP = 260;
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -93,7 +103,7 @@ public class MainActivity extends Activity {
     private LinearLayout tileRail;
     private TextView clockChrome;
     private TextView weatherTile;
-    private TextView stocksTile;
+    private LinearLayout stocksTile;
     private TextView greetingTile;
     private TextView birthdaysTile;
     private View overlay;
@@ -125,6 +135,12 @@ public class MainActivity extends Activity {
         public void run() {
             refreshClockChrome();
             ui.postDelayed(this, 30000);
+        }
+    };
+    private final Runnable refreshDashboardTiles = new Runnable() {
+        public void run() {
+            refreshDashboardDataAsync();
+            ui.postDelayed(this, 5 * 60 * 1000);
         }
     };
 
@@ -182,7 +198,7 @@ public class MainActivity extends Activity {
         clockChrome.setBackgroundColor(Color.argb(132, 0, 0, 0));
         greetingTile = createTile(false);
         weatherTile = createTile(false);
-        stocksTile = createTile(false);
+        stocksTile = createTileGroup();
         birthdaysTile = createTile(false);
         tileRail.addView(clockChrome, tileParams(dp(8)));
         tileRail.addView(greetingTile, tileParams(dp(8)));
@@ -198,6 +214,7 @@ public class MainActivity extends Activity {
         applyClockChromeSettings();
         refreshClockChrome();
         ui.postDelayed(updateClockChrome, 30000);
+        ui.post(refreshDashboardTiles);
 
         // Kept below controls for older modes; Google Photos must receive all album touches.
         overlay = new View(this);
@@ -580,12 +597,18 @@ public class MainActivity extends Activity {
         String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(now);
         String date = new SimpleDateFormat("MMM d", Locale.getDefault()).format(now);
         String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(now);
-        clockChrome.setText(time + "\n" + day + "\n" + date + "\n" + year);
+        String clockText = time + "\n" + day + "\n" + date + "\n" + year;
+        SpannableString clockSpan = new SpannableString(clockText);
+        int secondaryStart = time.length() + 1;
+        clockSpan.setSpan(new RelativeSizeSpan(0.5f), secondaryStart, clockText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        clockChrome.setText(clockSpan);
         String displayName = p.getString(KEY_DEVICE_FRIENDLY_NAME, "");
         greetingTile.setText(greetingFor(now) + "\n" + (TextUtils.isEmpty(displayName) ? "UniquePeople" : displayName));
         weatherTile.setText("Weather\nNot set");
-        stocksTile.setText("Stocks\nNot set");
+        setStocksTileText("Stocks\nNot set");
         birthdaysTile.setText("Birthdays\nNone today");
+        weatherTile.setText(p.getString(KEY_WEATHER_TILE_TEXT, "Weather\nNot set"));
+        setStocksTileText(p.getString(KEY_STOCKS_TILE_TEXT, "Stocks\nNot set"));
 
         clockChrome.setVisibility(p.getBoolean(KEY_TILE_CLOCK_ENABLED, true) ? View.VISIBLE : View.GONE);
         greetingTile.setVisibility(p.getBoolean(KEY_TILE_GREETING_ENABLED, false) ? View.VISIBLE : View.GONE);
@@ -605,10 +628,6 @@ public class MainActivity extends Activity {
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         String color = p.getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR);
         int size = p.getInt(KEY_CLOCK_TEXT_SIZE_SP, DEFAULT_CLOCK_TEXT_SIZE_SP);
-        if (size < DEFAULT_CLOCK_TEXT_SIZE_SP) {
-            size = DEFAULT_CLOCK_TEXT_SIZE_SP;
-            p.edit().putInt(KEY_CLOCK_TEXT_SIZE_SP, size).apply();
-        }
         if (size < MIN_CLOCK_TEXT_SIZE_SP) size = MIN_CLOCK_TEXT_SIZE_SP;
         if (size > MAX_CLOCK_TEXT_SIZE_SP) size = MAX_CLOCK_TEXT_SIZE_SP;
         int parsedColor = safeColor(color);
@@ -628,20 +647,27 @@ public class MainActivity extends Activity {
         tile.setTextColor(Color.parseColor(DEFAULT_CLOCK_COLOR));
         tile.setShadowLayer(12f, 0f, 3f, Color.BLACK);
         tile.setIncludeFontPadding(false);
-        tile.setLineSpacing(primary ? dp(8) : dp(4), 1.0f);
-        tile.setPadding(dp(14), dp(12), dp(14), dp(12));
-        tile.setTextSize(primary ? DEFAULT_CLOCK_TEXT_SIZE_SP : 18f);
+        tile.setLineSpacing(primary ? dp(2) : dp(2), 1.0f);
+        tile.setPadding(dp(12), dp(8), dp(12), dp(8));
+        tile.setTextSize(primary ? DEFAULT_CLOCK_TEXT_SIZE_SP : 16f);
         return tile;
     }
 
     private LinearLayout.LayoutParams tileParams(int bottomMargin) {
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                dp(TILE_RAIL_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT);
         lp.bottomMargin = bottomMargin;
         return lp;
     }
 
-    private void styleTile(TextView tile, int accentColor) {
+    private LinearLayout createTileGroup() {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        group.setPadding(dp(8), dp(6), dp(8), dp(6));
+        return group;
+    }
+
+    private void styleTile(View tile, int accentColor) {
         if (tile == null) return;
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.argb(112, 0, 0, 0));
@@ -734,6 +760,8 @@ public class MainActivity extends Activity {
         refreshClockChrome();
         ui.removeCallbacks(updateClockChrome);
         ui.postDelayed(updateClockChrome, 30000);
+        ui.removeCallbacks(refreshDashboardTiles);
+        ui.post(refreshDashboardTiles);
         if (!controlsAreHidden()) {
             ui.removeCallbacks(hideGear);
             ui.postDelayed(hideGear, 5000);
@@ -850,6 +878,234 @@ public class MainActivity extends Activity {
         editor.apply();
     }
 
+    private void refreshDashboardDataAsync() {
+        final Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            public void run() {
+                try {
+                    HttpURLConnection c = (HttpURLConnection) new URL(buildDashboardDataUrl(app)).openConnection();
+                    c.setConnectTimeout(3500);
+                    c.setReadTimeout(5000);
+                    c.setInstanceFollowRedirects(true);
+                    c.connect();
+                    int code = c.getResponseCode();
+                    InputStream in = code >= 400 ? c.getErrorStream() : c.getInputStream();
+                    String body = readText(in);
+                    if (code >= 400) throw new Exception("Dashboard returned HTTP " + code);
+                    JSONObject root = new JSONObject(body);
+                    final String weatherText = formatWeatherTile(root.optJSONObject("weather"));
+                    final String stocksText = formatStocksTile(root.optJSONObject("sp500"), root.optJSONArray("stocks"), root.optJSONObject("status"));
+                    app.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                            .putString(KEY_WEATHER_TILE_TEXT, weatherText)
+                            .putString(KEY_STOCKS_TILE_TEXT, stocksText)
+                            .putLong(KEY_LAST_DASHBOARD_REFRESH_MS, System.currentTimeMillis())
+                            .apply();
+                    ui.post(new Runnable() {
+                        public void run() {
+                            if (weatherTile != null) weatherTile.setText(weatherText);
+                            setStocksTileText(stocksText);
+                            refreshClockChrome();
+                        }
+                    });
+                } catch (Exception ignored) {
+                    ui.post(new Runnable() {
+                        public void run() { refreshClockChrome(); }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    static String buildDashboardDataUrl(Context context) {
+        String deviceId = getOrCreateDeviceId(context);
+        try {
+            return DEFAULT_DASHBOARD_DATA_URL + "?deviceId=" + URLEncoder.encode(deviceId, "UTF-8");
+        } catch (Exception e) {
+            return DEFAULT_DASHBOARD_DATA_URL + "?deviceId=" + deviceId;
+        }
+    }
+
+    private static String formatWeatherTile(JSONObject weather) {
+        if (weather == null || !weather.optBoolean("enabled", false)) return "Weather\nNot set";
+        String condition = weather.optString("condition", "Weather").toUpperCase(Locale.US);
+        String icon = weather.optString("icon", "");
+        int temp = weather.optInt("temperatureF", Integer.MIN_VALUE);
+        int high = weather.optInt("highF", Integer.MIN_VALUE);
+        int low = weather.optInt("lowF", Integer.MIN_VALUE);
+        StringBuilder out = new StringBuilder();
+        out.append(TextUtils.isEmpty(icon) ? "Weather" : icon).append(" ").append(condition);
+        if (temp != Integer.MIN_VALUE) out.append("\n").append(temp).append("°F");
+        if (high != Integer.MIN_VALUE && low != Integer.MIN_VALUE) {
+            out.append("\nH ").append(high).append("  L ").append(low);
+        }
+        return out.toString();
+    }
+
+    private static String formatStocksTile(JSONObject sp500, JSONArray stocks, JSONObject status) {
+        StringBuilder out = new StringBuilder();
+        out.append("STOCKS");
+        String syncedLabel = formatSyncedLabel(status);
+        if (!TextUtils.isEmpty(syncedLabel)) out.append(" · ").append(syncedLabel);
+        appendQuote(out, sp500, "S&P 500");
+        if (stocks != null) {
+            for (int i = 0; i < stocks.length(); i++) {
+                JSONObject quote = stocks.optJSONObject(i);
+                if (quote != null) appendQuote(out, quote, "");
+            }
+        }
+        if (out.length() == 0) out.append("Stocks\nNot set");
+        return out.toString();
+    }
+
+    private static String formatSyncedLabel(JSONObject status) {
+        if (status == null) return "";
+        String prefix = status.optBoolean("cached", false) ? "Cached" : "Synced";
+        String updatedAt = status.optString("updatedAt", "");
+        String time = formatIsoTime(updatedAt);
+        return TextUtils.isEmpty(time) ? prefix : prefix + " " + time;
+    }
+
+    private static String formatIsoTime(String updatedAt) {
+        if (TextUtils.isEmpty(updatedAt)) return "";
+        try {
+            SimpleDateFormat input = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", Locale.US);
+            input.setTimeZone(TimeZone.getTimeZone("UTC"));
+            Date date = input.parse(updatedAt);
+            if (date == null) return "";
+            return new SimpleDateFormat("h:mm a", Locale.getDefault()).format(date);
+        } catch (Exception ignored) {
+            return "";
+        }
+    }
+
+    private void setStocksTileText(String text) {
+        if (stocksTile == null) return;
+        stocksTile.removeAllViews();
+        if (TextUtils.isEmpty(text)) {
+            addStocksHeader("Stocks\nNot set");
+            return;
+        }
+        String[] lines = text.split("\\n");
+        if (lines.length == 0) {
+            addStocksHeader(text);
+            return;
+        }
+        addStocksHeader(lines[0]);
+        if (lines.length > 1) {
+            stocksTile.addView(buildStockCard(lines[1], true), stockSubTileParams());
+        }
+        int stockCount = Math.max(0, lines.length - 2);
+        if (stockCount > 0) {
+            LinearLayout chipRow = new LinearLayout(this);
+            chipRow.setOrientation(LinearLayout.HORIZONTAL);
+            int start = (int) ((System.currentTimeMillis() / 30000L) % stockCount);
+            int visible = Math.min(2, stockCount);
+            for (int i = 0; i < visible; i++) {
+                int lineIndex = 2 + ((start + i) % stockCount);
+                LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
+                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+                if (i > 0) chipParams.leftMargin = dp(5);
+                chipRow.addView(buildStockCard(lines[lineIndex], false), chipParams);
+            }
+            stocksTile.addView(chipRow, stockSubTileParams());
+        }
+    }
+
+    private void addStocksHeader(String text) {
+        TextView header = new TextView(this);
+        header.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        header.setTextColor(safeColor(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR)));
+        header.setTextSize(9f);
+        header.setIncludeFontPadding(false);
+        header.setText(text);
+        stocksTile.addView(header, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+    }
+
+    private View buildStockCard(String line, boolean featured) {
+        String[] parts = line.split("\\|", -1);
+        if (parts.length < 4) {
+            TextView fallback = createTile(false);
+            fallback.setText(line);
+            return fallback;
+        }
+        String symbol = parts[0];
+        String price = parts[1];
+        String percent = parts[2];
+        String direction = parts[3];
+        int accent = safeColor(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR));
+
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setPadding(featured ? dp(8) : dp(6), featured ? dp(5) : dp(4), featured ? dp(8) : dp(6), featured ? dp(5) : dp(4));
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.argb(132, 8, 10, 18));
+        bg.setStroke(dp(1), Color.argb(180, Color.red(accent), Color.green(accent), Color.blue(accent)));
+        bg.setCornerRadius(dp(6));
+        card.setBackground(bg);
+
+        LinearLayout top = new LinearLayout(this);
+        top.setOrientation(LinearLayout.HORIZONTAL);
+        top.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView title = stockText(featured ? symbol : symbol.replace("^", ""), featured ? 10f : 7f, Color.LTGRAY);
+        top.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+
+        TextView pill = stockText("GOOD", featured ? 8f : 6f, accent);
+        pill.setGravity(Gravity.CENTER);
+        GradientDrawable pillBg = new GradientDrawable();
+        pillBg.setColor(Color.argb(72, Color.red(accent), Color.green(accent), Color.blue(accent)));
+        pillBg.setStroke(dp(1), accent);
+        pillBg.setCornerRadius(dp(5));
+        pill.setBackground(pillBg);
+        pill.setPadding(dp(6), dp(2), dp(6), dp(2));
+        top.addView(pill, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout bottom = new LinearLayout(this);
+        bottom.setOrientation(LinearLayout.HORIZONTAL);
+        bottom.setGravity(Gravity.CENTER_VERTICAL);
+        TextView priceView = stockText(price, featured ? 17f : 10f, Color.WHITE);
+        bottom.addView(priceView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        String arrow = "down".equals(direction) ? "▼ " : ("flat".equals(direction) ? "" : "▲ ");
+        int trendColor = "down".equals(direction) ? Color.rgb(255, 83, 112) : accent;
+        TextView trend = stockText(arrow + percent, featured ? 14f : 9f, trendColor);
+        bottom.addView(trend, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        card.addView(top);
+        card.addView(bottom);
+        return card;
+    }
+
+    private LinearLayout.LayoutParams stockSubTileParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(4);
+        return params;
+    }
+
+    private TextView stockText(String text, float sizeSp, int color) {
+        TextView view = new TextView(this);
+        view.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        view.setIncludeFontPadding(false);
+        view.setTextColor(color);
+        view.setTextSize(sizeSp);
+        view.setText(text);
+        return view;
+    }
+
+    private static void appendQuote(StringBuilder out, JSONObject quote, String label) {
+        if (quote == null) return;
+        String symbol = quote.optString("symbol", quote.optString("label", "")).trim();
+        if (TextUtils.isEmpty(symbol)) symbol = label;
+        String percent = quote.optString("dayReturnPercent", "--");
+        String price = quote.optString("price", "");
+        String direction = quote.optString("direction", "flat");
+        if (TextUtils.isEmpty(symbol)) return;
+        if (!TextUtils.isEmpty(price) && !price.startsWith("$")) price = "$" + price;
+        if (out.length() > 0) out.append("\n");
+        out.append(symbol).append("|").append(price).append("|").append(percent).append("|").append(direction);
+    }
+
     private static boolean isValidWebUrl(String url) {
         return url != null && (url.startsWith("http://") || url.startsWith("https://"));
     }
@@ -872,6 +1128,7 @@ public class MainActivity extends Activity {
         if (albumView != null) albumView.onPause();
         ui.removeCallbacks(advanceDefaultPhoto);
         ui.removeCallbacks(updateClockChrome);
+        ui.removeCallbacks(refreshDashboardTiles);
         if (video != null) video.pause();
     }
 
