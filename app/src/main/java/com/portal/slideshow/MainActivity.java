@@ -51,6 +51,7 @@ import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
+import java.util.Random;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -117,6 +118,7 @@ public class MainActivity extends Activity {
     private boolean albumZoomApplied;
     private boolean albumLoadFailed;
     private final Handler ui = new Handler(Looper.getMainLooper());
+    private final Random random = new Random();
     private final Runnable hideGear = new Runnable() {
         public void run() {
             if (gear != null) gear.setVisibility(View.GONE);
@@ -143,9 +145,15 @@ public class MainActivity extends Activity {
     private final Runnable refreshDashboardTiles = new Runnable() {
         public void run() {
             refreshDashboardDataAsync();
-            ui.postDelayed(this, 5 * 60 * 1000);
+            ui.postDelayed(this, nextDashboardRefreshDelayMs());
         }
     };
+
+    private long nextDashboardRefreshDelayMs() {
+        long base = 12 * 60 * 1000L;
+        long jitter = (long) random.nextInt(7 * 60 * 1000);
+        return base + jitter;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
