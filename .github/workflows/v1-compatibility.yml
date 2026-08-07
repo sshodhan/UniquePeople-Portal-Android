@@ -1,0 +1,17 @@
+name: V1 Compatibility
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  v1-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run v1 compatibility guardrails
+        run: scripts/check-v1-compatibility.sh

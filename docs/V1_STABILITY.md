@@ -131,6 +131,24 @@ Run this checklist before considering any build safe for customer use:
 - QR scan button opens the camera or gives a clear failure path.
 - No OpenAI API key or private token is present in APK source, client HTML, or browser source.
 
+## Automated Guardrails
+
+The repo includes a v1 compatibility script:
+
+```bash
+scripts/check-v1-compatibility.sh
+```
+
+The script checks the installed v1 contract, including package name, app name, stored preference keys, production config URLs, default album URL, Google Photos mode values, compact clock overlay shape, and the presence of these stability notes.
+
+GitHub Actions runs the same script on pushes to `main` and on pull requests:
+
+```text
+.github/workflows/v1-compatibility.yml
+```
+
+This check is a tripwire, not a replacement for real testing. If it fails, either fix the regression or update this document with an intentional migration plan before changing the check.
+
 ## Vercel Config Test
 
 To change the customer Portal album through the web config endpoint:

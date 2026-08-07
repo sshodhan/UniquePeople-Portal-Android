@@ -37,3 +37,9 @@ The debug APK is written to `app-debug.apk`.
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).
+
+Run the local compatibility guardrail before shipping APK changes:
+
+```bash
+scripts/check-v1-compatibility.sh
+```
