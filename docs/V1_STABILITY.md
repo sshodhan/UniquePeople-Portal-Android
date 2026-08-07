@@ -24,6 +24,7 @@ V2 is an intentional in-place upgrade for additional family Portal devices, not 
 - V2 visible Settings title: `UniquePeople V2 Settings`
 - V2 install rule: save the currently installed APK first, then use `adb install -r app-debug.apk`
 - V2 rollback rule: if rollback is needed, reinstall the preserved APK for that exact Portal. If Android blocks downgrade from V2 to V1, stop and explain options before clearing data or uninstalling.
+- V2 tile rail: optional local display settings for Clock, Daily greeting, Weather, Stocks, and Birthday reminders. Clock defaults on. Other tiles default off until data sources are configured. These settings must not change V1 web API fields or make album display depend on tile data.
 
 ## Must Not Break
 

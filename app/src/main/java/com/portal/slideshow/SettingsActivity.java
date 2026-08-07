@@ -18,6 +18,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -48,6 +49,7 @@ public class SettingsActivity extends Activity {
     private ImageView pairingQr;
     private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
     private RadioButton rClockGreen, rClockWhite, rClockAmber, rClockCyan;
+    private CheckBox tileClock, tileWeather, tileStocks, tileGreeting, tileBirthdays;
     private final Handler ui = new Handler(Looper.getMainLooper());
 
     @Override
@@ -63,6 +65,11 @@ public class SettingsActivity extends Activity {
         String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
         String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
         int clockSize = p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP);
+        boolean showClock = p.getBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, true);
+        boolean showWeather = p.getBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, false);
+        boolean showStocks = p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false);
+        boolean showGreeting = p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, false);
+        boolean showBirthdays = p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         boolean hasBundled = hasBundledVideo();
 
@@ -154,9 +161,10 @@ public class SettingsActivity extends Activity {
         albumSetup.addView(scanQr, wide(dp(10)));
 
         LinearLayout display = addExpandableSection(col, "Display",
-                "Adjust the clock overlay that appears over the photos.",
+                "Adjust the tile rail that appears over the photos.",
                 false);
-        addClockDisplaySettings(display, clockColor, clockSize);
+        addClockDisplaySettings(display, clockColor, clockSize,
+                showClock, showWeather, showStocks, showGreeting, showBirthdays);
 
         LinearLayout advanced = addExpandableSection(col, "Advanced",
                 "Website viewer, assistant, and legacy video fallback options.",
@@ -276,14 +284,34 @@ public class SettingsActivity extends Activity {
         else if (rClockAmber != null && "#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
         else if (rClockCyan != null && "#00E5FF".equalsIgnoreCase(clockColor)) rClockCyan.setChecked(true);
         else if (rClockGreen != null) rClockGreen.setChecked(true);
+        if (tileClock != null) tileClock.setChecked(p.getBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, true));
+        if (tileWeather != null) tileWeather.setChecked(p.getBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, false));
+        if (tileStocks != null) tileStocks.setChecked(p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false));
+        if (tileGreeting != null) tileGreeting.setChecked(p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, false));
+        if (tileBirthdays != null) tileBirthdays.setChecked(p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false));
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
         else rGooglePhotos.setChecked(true);
     }
 
-    private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize) {
+    private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize,
+                                         boolean showClock, boolean showWeather, boolean showStocks,
+                                         boolean showGreeting, boolean showBirthdays) {
+        col.addView(sectionTitle("Tile Rail"));
+        col.addView(help("Shown as compact stacked tiles on the left side of the slideshow. Optional tiles can stay hidden until their data is ready."));
+        tileClock = checkbox("Clock", showClock);
+        tileGreeting = checkbox("Daily greeting", showGreeting);
+        tileWeather = checkbox("Weather", showWeather);
+        tileStocks = checkbox("Stocks", showStocks);
+        tileBirthdays = checkbox("Birthday reminders", showBirthdays);
+        col.addView(tileClock);
+        col.addView(tileGreeting);
+        col.addView(tileWeather);
+        col.addView(tileStocks);
+        col.addView(tileBirthdays);
+
         col.addView(sectionTitle("Clock Display"));
-        col.addView(help("Shown as a classic left-side digital clock rail over the slideshow. Green is the default because it is easiest to read across the room."));
+        col.addView(help("Green is the default because it is easiest to read across the room. The clock tile keeps time, day, date, and year stacked."));
         col.addView(fieldLabel("Clock color"));
         RadioGroup clockColorGroup = new RadioGroup(this);
         rClockGreen = radio("Classic digital green");
@@ -388,6 +416,11 @@ public class SettingsActivity extends Activity {
                 .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
                 .putString(MainActivity.KEY_CLOCK_COLOR, clockColor)
                 .putInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, clockSize)
+                .putBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, tileClock == null || tileClock.isChecked())
+                .putBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, tileWeather != null && tileWeather.isChecked())
+                .putBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, tileStocks != null && tileStocks.isChecked())
+                .putBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, tileGreeting != null && tileGreeting.isChecked())
+                .putBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, tileBirthdays != null && tileBirthdays.isChecked())
                 .apply();
         setResult(RESULT_OK);
         finish();
@@ -589,6 +622,17 @@ public class SettingsActivity extends Activity {
         r.setMinHeight(dp(56));
         r.setPadding(dp(8), 0, 0, 0);
         return r;
+    }
+
+    private CheckBox checkbox(String t, boolean checked) {
+        CheckBox c = new CheckBox(this);
+        c.setText(t);
+        c.setTextColor(Color.WHITE);
+        c.setTextSize(18f);
+        c.setMinHeight(dp(56));
+        c.setPadding(dp(8), 0, 0, 0);
+        c.setChecked(checked);
+        return c;
     }
 
     private Button bigButton(String t, String color) {

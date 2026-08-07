@@ -7,6 +7,7 @@ import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Bundle;
@@ -21,6 +22,7 @@ import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.VideoView;
 import android.webkit.WebSettings;
@@ -58,6 +60,11 @@ public class MainActivity extends Activity {
     static final String KEY_LAST_REMOTE_REFRESH_MS = "last_remote_refresh_ms";
     static final String KEY_CLOCK_COLOR = "clock_color";
     static final String KEY_CLOCK_TEXT_SIZE_SP = "clock_text_size_sp";
+    static final String KEY_TILE_CLOCK_ENABLED = "tile_clock_enabled";
+    static final String KEY_TILE_WEATHER_ENABLED = "tile_weather_enabled";
+    static final String KEY_TILE_STOCKS_ENABLED = "tile_stocks_enabled";
+    static final String KEY_TILE_GREETING_ENABLED = "tile_greeting_enabled";
+    static final String KEY_TILE_BIRTHDAYS_ENABLED = "tile_birthdays_enabled";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
@@ -83,7 +90,12 @@ public class MainActivity extends Activity {
     private WebView albumView;
     private ImageView defaultPhoto;
     private TextView status;
+    private LinearLayout tileRail;
     private TextView clockChrome;
+    private TextView weatherTile;
+    private TextView stocksTile;
+    private TextView greetingTile;
+    private TextView birthdaysTile;
     private View overlay;
     private Button gear;
     private Button assistant;
@@ -163,20 +175,26 @@ public class MainActivity extends Activity {
         status.setVisibility(View.GONE);
         root.addView(status, slp);
 
-        clockChrome = new TextView(this);
-        clockChrome.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
-        clockChrome.setGravity(Gravity.TOP | Gravity.LEFT);
-        clockChrome.setShadowLayer(12f, 0f, 3f, Color.BLACK);
+        tileRail = new LinearLayout(this);
+        tileRail.setOrientation(LinearLayout.VERTICAL);
+        tileRail.setGravity(Gravity.LEFT);
+        clockChrome = createTile(true);
         clockChrome.setBackgroundColor(Color.argb(132, 0, 0, 0));
-        clockChrome.setIncludeFontPadding(false);
-        clockChrome.setLineSpacing(dp(8), 1.0f);
-        clockChrome.setPadding(dp(14), dp(12), dp(14), dp(12));
+        greetingTile = createTile(false);
+        weatherTile = createTile(false);
+        stocksTile = createTile(false);
+        birthdaysTile = createTile(false);
+        tileRail.addView(clockChrome, tileParams(dp(8)));
+        tileRail.addView(greetingTile, tileParams(dp(8)));
+        tileRail.addView(weatherTile, tileParams(dp(8)));
+        tileRail.addView(stocksTile, tileParams(dp(8)));
+        tileRail.addView(birthdaysTile, tileParams(dp(8)));
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         clp.gravity = Gravity.TOP | Gravity.LEFT;
         clp.leftMargin = dp(18);
         clp.topMargin = dp(58);
-        root.addView(clockChrome, clp);
+        root.addView(tileRail, clp);
         applyClockChromeSettings();
         refreshClockChrome();
         ui.postDelayed(updateClockChrome, 30000);
@@ -547,7 +565,7 @@ public class MainActivity extends Activity {
         overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
-        if (clockChrome != null) clockChrome.bringToFront();
+        if (tileRail != null) tileRail.bringToFront();
         gear.bringToFront();
         assistant.bringToFront();
         ui.removeCallbacks(hideGear);
@@ -555,13 +573,31 @@ public class MainActivity extends Activity {
     }
 
     private void refreshClockChrome() {
-        if (clockChrome == null) return;
+        if (clockChrome == null || tileRail == null) return;
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
         Date now = new Date();
         String time = new SimpleDateFormat("h:mm a", Locale.getDefault()).format(now);
         String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(now);
         String date = new SimpleDateFormat("MMM d", Locale.getDefault()).format(now);
         String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(now);
         clockChrome.setText(time + "\n" + day + "\n" + date + "\n" + year);
+        String displayName = p.getString(KEY_DEVICE_FRIENDLY_NAME, "");
+        greetingTile.setText(greetingFor(now) + "\n" + (TextUtils.isEmpty(displayName) ? "UniquePeople" : displayName));
+        weatherTile.setText("Weather\nNot set");
+        stocksTile.setText("Stocks\nNot set");
+        birthdaysTile.setText("Birthdays\nNone today");
+
+        clockChrome.setVisibility(p.getBoolean(KEY_TILE_CLOCK_ENABLED, true) ? View.VISIBLE : View.GONE);
+        greetingTile.setVisibility(p.getBoolean(KEY_TILE_GREETING_ENABLED, false) ? View.VISIBLE : View.GONE);
+        weatherTile.setVisibility(p.getBoolean(KEY_TILE_WEATHER_ENABLED, false) ? View.VISIBLE : View.GONE);
+        stocksTile.setVisibility(p.getBoolean(KEY_TILE_STOCKS_ENABLED, false) ? View.VISIBLE : View.GONE);
+        birthdaysTile.setVisibility(p.getBoolean(KEY_TILE_BIRTHDAYS_ENABLED, false) ? View.VISIBLE : View.GONE);
+        boolean anyVisible = clockChrome.getVisibility() == View.VISIBLE
+                || greetingTile.getVisibility() == View.VISIBLE
+                || weatherTile.getVisibility() == View.VISIBLE
+                || stocksTile.getVisibility() == View.VISIBLE
+                || birthdaysTile.getVisibility() == View.VISIBLE;
+        tileRail.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
     }
 
     private void applyClockChromeSettings() {
@@ -575,12 +611,63 @@ public class MainActivity extends Activity {
         }
         if (size < MIN_CLOCK_TEXT_SIZE_SP) size = MIN_CLOCK_TEXT_SIZE_SP;
         if (size > MAX_CLOCK_TEXT_SIZE_SP) size = MAX_CLOCK_TEXT_SIZE_SP;
-        try {
-            clockChrome.setTextColor(Color.parseColor(color));
-        } catch (Exception e) {
-            clockChrome.setTextColor(Color.parseColor(DEFAULT_CLOCK_COLOR));
-        }
+        int parsedColor = safeColor(color);
+        clockChrome.setTextColor(parsedColor);
         clockChrome.setTextSize(size);
+        styleTile(clockChrome, parsedColor);
+        styleTile(greetingTile, parsedColor);
+        styleTile(weatherTile, parsedColor);
+        styleTile(stocksTile, parsedColor);
+        styleTile(birthdaysTile, parsedColor);
+    }
+
+    private TextView createTile(boolean primary) {
+        TextView tile = new TextView(this);
+        tile.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
+        tile.setGravity(Gravity.LEFT);
+        tile.setTextColor(Color.parseColor(DEFAULT_CLOCK_COLOR));
+        tile.setShadowLayer(12f, 0f, 3f, Color.BLACK);
+        tile.setIncludeFontPadding(false);
+        tile.setLineSpacing(primary ? dp(8) : dp(4), 1.0f);
+        tile.setPadding(dp(14), dp(12), dp(14), dp(12));
+        tile.setTextSize(primary ? DEFAULT_CLOCK_TEXT_SIZE_SP : 18f);
+        return tile;
+    }
+
+    private LinearLayout.LayoutParams tileParams(int bottomMargin) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.bottomMargin = bottomMargin;
+        return lp;
+    }
+
+    private void styleTile(TextView tile, int accentColor) {
+        if (tile == null) return;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(Color.argb(112, 0, 0, 0));
+        bg.setStroke(dp(2), accentColor);
+        bg.setCornerRadius(dp(8));
+        tile.setBackground(bg);
+    }
+
+    private int safeColor(String color) {
+        try {
+            return Color.parseColor(color);
+        } catch (Exception e) {
+            return Color.parseColor(DEFAULT_CLOCK_COLOR);
+        }
+    }
+
+    private String greetingFor(Date now) {
+        int hour;
+        try {
+            hour = Integer.parseInt(new SimpleDateFormat("H", Locale.US).format(now));
+        } catch (Exception e) {
+            hour = 12;
+        }
+        if (hour < 12) return "Good morning";
+        if (hour < 17) return "Good afternoon";
+        return "Good evening";
     }
 
     private int dp(int value) {
