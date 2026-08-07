@@ -15,6 +15,16 @@ UniquePeople v1 is live on one customer Portal. We should keep innovating, but i
 - APK path after build: `app-debug.apk`
 - Build command for shareable APKs: `INCLUDE_VIDEO=0 ./build.sh`
 
+## V2 Rollout Note
+
+V2 is an intentional in-place upgrade for additional family Portal devices, not a separate app. It keeps the same Android package name, signing flow, preference keys, web config URLs, and local data preservation behavior so an installed V1 can be upgraded with `adb install -r` without clearing data.
+
+- V2 Android versionCode: `2`
+- V2 Android versionName: `2.0`
+- V2 visible Settings title: `UniquePeople V2 Settings`
+- V2 install rule: save the currently installed APK first, then use `adb install -r app-debug.apk`
+- V2 rollback rule: if rollback is needed, reinstall the preserved APK for that exact Portal. If Android blocks downgrade from V2 to V1, stop and explain options before clearing data or uninstalling.
+
 ## Must Not Break
 
 1. Preserve package name `com.portal.slideshow`.

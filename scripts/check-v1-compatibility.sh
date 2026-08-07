@@ -40,10 +40,19 @@ require_file "$STABILITY_DOC"
 
 require_text "$MANIFEST" 'package="com.portal.slideshow"' \
   "package name changed; installed v1 settings would not be preserved"
-require_text "$MANIFEST" 'android:versionCode="1"' \
-  "v1 versionCode changed; document migration and rollback expectations first"
-require_text "$MANIFEST" 'android:versionName="1.0"' \
-  "v1 versionName changed; document migration and rollback expectations first"
+if grep -Fq 'android:versionCode="1"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="1.0"' \
+    "v1 versionName changed unexpectedly"
+elif grep -Fq 'android:versionCode="2"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="2.0"' \
+    "v2 versionName must be 2.0"
+  require_text "$STABILITY_DOC" '## V2 Rollout Note' \
+    "v2 version bump requires an explicit rollout note"
+  require_text "$STABILITY_DOC" 'V2 rollback rule' \
+    "v2 version bump requires rollback expectations"
+else
+  fail "unsupported Android versionCode; document migration and rollback expectations first"
+fi
 
 require_text "$STRINGS" '<string name="app_name">UniquePeople</string>' \
   "app name changed from UniquePeople"

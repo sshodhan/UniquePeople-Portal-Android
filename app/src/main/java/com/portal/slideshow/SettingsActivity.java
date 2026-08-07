@@ -52,7 +52,7 @@ public class SettingsActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle("UniquePeople Settings");
+        setTitle("UniquePeople V2 Settings");
 
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_URL, "");
@@ -76,8 +76,8 @@ public class SettingsActivity extends Activity {
         final String deviceId = MainActivity.getOrCreateDeviceId(this);
         final String pairingUrl = MainActivity.buildPairingUrl(this);
 
-        col.addView(title("UniquePeople Settings"));
-        col.addView(label("Set up this Portal in a few steps. Start with your phone, then refresh here and save."));
+        col.addView(title("UniquePeople V2 Settings"));
+        col.addView(label("V2 setup for this Portal. Start with your phone, then refresh here and save."));
 
         LinearLayout phoneSetup = addExpandableSection(col, "1. Use Your Phone",
                 "Scan the QR code with your phone, choose the album on the web page, then tap Refresh from Web here.",
