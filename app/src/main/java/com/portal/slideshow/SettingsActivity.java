@@ -43,11 +43,13 @@ public class SettingsActivity extends Activity {
     private EditText albumUrlField;
     private EditText photoHostUrlField;
     private EditText assistantUrlField;
+    private EditText hostedTilesUrlField;
     private EditText pairingUrlField;
     private EditText displayNameField;
     private EditText clockSizeField;
     private ImageView pairingQr;
     private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
+    private RadioButton rTileNative, rTileHosted;
     private RadioButton rClockGreen, rClockWhite, rClockAmber, rClockCyan;
     private CheckBox tileClock, tileWeather, tileStocks, tileGreeting, tileBirthdays;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -62,6 +64,7 @@ public class SettingsActivity extends Activity {
         String albumUrl = MainActivity.getAlbumUrl(p);
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
+        String hostedTilesUrl = p.getString(MainActivity.KEY_HOSTED_TILES_URL, MainActivity.DEFAULT_HOSTED_TILES_URL);
         String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
         String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
         int clockSize = p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP);
@@ -70,6 +73,7 @@ public class SettingsActivity extends Activity {
         boolean showStocks = p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false);
         boolean showGreeting = p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, false);
         boolean showBirthdays = p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false);
+        String tileRenderer = p.getString(MainActivity.KEY_TILE_RENDERER, MainActivity.TILE_RENDERER_NATIVE);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
         boolean hasBundled = hasBundledVideo();
 
@@ -164,7 +168,8 @@ public class SettingsActivity extends Activity {
                 "Adjust the tile rail that appears over the photos.",
                 false);
         addClockDisplaySettings(display, clockColor, clockSize,
-                showClock, showWeather, showStocks, showGreeting, showBirthdays);
+                showClock, showWeather, showStocks, showGreeting, showBirthdays,
+                tileRenderer, hostedTilesUrl);
 
         LinearLayout advanced = addExpandableSection(col, "Advanced",
                 "Website viewer, assistant, and legacy video fallback options.",
@@ -272,6 +277,9 @@ public class SettingsActivity extends Activity {
         albumUrlField.setText(MainActivity.getAlbumUrl(p));
         photoHostUrlField.setText(p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL));
         assistantUrlField.setText(p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL));
+        if (hostedTilesUrlField != null) {
+            hostedTilesUrlField.setText(p.getString(MainActivity.KEY_HOSTED_TILES_URL, MainActivity.DEFAULT_HOSTED_TILES_URL));
+        }
         if (displayNameField != null) {
             String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
             displayNameField.setText(TextUtils.isEmpty(displayName) ? "Not set yet" : displayName);
@@ -279,6 +287,9 @@ public class SettingsActivity extends Activity {
         if (clockSizeField != null) {
             clockSizeField.setText(String.valueOf(p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP)));
         }
+        String tileRenderer = p.getString(MainActivity.KEY_TILE_RENDERER, MainActivity.TILE_RENDERER_NATIVE);
+        if (rTileHosted != null && MainActivity.TILE_RENDERER_HOSTED.equals(tileRenderer)) rTileHosted.setChecked(true);
+        else if (rTileNative != null) rTileNative.setChecked(true);
         String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
         if (rClockWhite != null && "#FFFFFF".equalsIgnoreCase(clockColor)) rClockWhite.setChecked(true);
         else if (rClockAmber != null && "#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
@@ -296,9 +307,32 @@ public class SettingsActivity extends Activity {
 
     private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize,
                                          boolean showClock, boolean showWeather, boolean showStocks,
-                                         boolean showGreeting, boolean showBirthdays) {
+                                         boolean showGreeting, boolean showBirthdays,
+                                         String tileRenderer, String hostedTilesUrl) {
         col.addView(sectionTitle("Tile Rail"));
         col.addView(help("Shown as compact stacked tiles on the left side of the slideshow. Optional tiles can stay hidden until their data is ready."));
+        col.addView(fieldLabel("Tile renderer"));
+        col.addView(help("Native tiles are the stable local fallback. Hosted web tiles are V3 and can be updated from Vercel without rebuilding the APK."));
+        RadioGroup tileRendererGroup = new RadioGroup(this);
+        rTileNative = radio("Native Portal tiles");
+        rTileHosted = radio("Hosted web tiles (V3)");
+        tileRendererGroup.addView(rTileNative);
+        tileRendererGroup.addView(rTileHosted);
+        col.addView(tileRendererGroup, wide(dp(4)));
+        if (MainActivity.TILE_RENDERER_HOSTED.equals(tileRenderer)) rTileHosted.setChecked(true);
+        else rTileNative.setChecked(true);
+
+        col.addView(fieldLabel("Hosted tiles URL"));
+        hostedTilesUrlField = new EditText(this);
+        hostedTilesUrlField.setHint(MainActivity.DEFAULT_HOSTED_TILES_URL);
+        hostedTilesUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
+        hostedTilesUrlField.setText(hostedTilesUrl);
+        hostedTilesUrlField.setTextColor(Color.WHITE);
+        hostedTilesUrlField.setHintTextColor(Color.parseColor("#7A8090"));
+        hostedTilesUrlField.setTextSize(18f);
+        hostedTilesUrlField.setMinHeight(dp(64));
+        col.addView(hostedTilesUrlField, wide(dp(12)));
+
         tileClock = checkbox("Clock", showClock);
         tileGreeting = checkbox("Daily greeting", showGreeting);
         tileWeather = checkbox("Weather", showWeather);
@@ -405,6 +439,11 @@ public class SettingsActivity extends Activity {
             Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
             return;
         }
+        String hostedTilesUrl = normalizeHostedTilesUrl();
+        if (!isValidWebUrl(hostedTilesUrl)) {
+            Toast.makeText(this, "Hosted tiles URL must start with http:// or https://", Toast.LENGTH_LONG).show();
+            return;
+        }
         int clockSize = normalizeClockSize();
         if (clockSize < 0) return;
         String clockColor = selectedClockColor();
@@ -414,6 +453,8 @@ public class SettingsActivity extends Activity {
                 .putString(MainActivity.KEY_PHOTO_HOST_URL, photoHostUrl)
                 .putInt(MainActivity.KEY_MODE, mode)
                 .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
+                .putString(MainActivity.KEY_HOSTED_TILES_URL, hostedTilesUrl)
+                .putString(MainActivity.KEY_TILE_RENDERER, selectedTileRenderer())
                 .putString(MainActivity.KEY_CLOCK_COLOR, clockColor)
                 .putInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, clockSize)
                 .putBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, tileClock == null || tileClock.isChecked())
@@ -431,6 +472,17 @@ public class SettingsActivity extends Activity {
         if (rClockAmber != null && rClockAmber.isChecked()) return "#FFB000";
         if (rClockCyan != null && rClockCyan.isChecked()) return "#00E5FF";
         return MainActivity.DEFAULT_CLOCK_COLOR;
+    }
+
+    private String selectedTileRenderer() {
+        if (rTileHosted != null && rTileHosted.isChecked()) return MainActivity.TILE_RENDERER_HOSTED;
+        return MainActivity.TILE_RENDERER_NATIVE;
+    }
+
+    private String normalizeHostedTilesUrl() {
+        if (hostedTilesUrlField == null) return MainActivity.DEFAULT_HOSTED_TILES_URL;
+        String value = hostedTilesUrlField.getText().toString().trim();
+        return TextUtils.isEmpty(value) ? MainActivity.DEFAULT_HOSTED_TILES_URL : value;
     }
 
     private int normalizeClockSize() {

@@ -74,12 +74,15 @@ public class MainActivity extends Activity {
     static final String KEY_TILE_STOCKS_ENABLED = "tile_stocks_enabled";
     static final String KEY_TILE_GREETING_ENABLED = "tile_greeting_enabled";
     static final String KEY_TILE_BIRTHDAYS_ENABLED = "tile_birthdays_enabled";
+    static final String KEY_TILE_RENDERER = "tile_renderer";
+    static final String KEY_HOSTED_TILES_URL = "hosted_tiles_url";
     static final String KEY_WEATHER_TILE_TEXT = "weather_tile_text";
     static final String KEY_STOCKS_TILE_TEXT = "stocks_tile_text";
     static final String KEY_LAST_DASHBOARD_REFRESH_MS = "last_dashboard_refresh_ms";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_DASHBOARD_DATA_URL = "https://uniquepeople-web.vercel.app/api/dashboard-data";
+    static final String DEFAULT_HOSTED_TILES_URL = "https://uniquepeople-web.vercel.app/tiles";
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
@@ -88,6 +91,8 @@ public class MainActivity extends Activity {
     static final int MIN_CLOCK_TEXT_SIZE_SP = 24;
     static final int MAX_CLOCK_TEXT_SIZE_SP = 72;
     static final int TILE_RAIL_WIDTH_DP = 340;
+    static final String TILE_RENDERER_NATIVE = "native";
+    static final String TILE_RENDERER_HOSTED = "hosted";
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -102,6 +107,7 @@ public class MainActivity extends Activity {
 
     private VideoView video;
     private WebView albumView;
+    private WebView hostedTilesView;
     private ImageView defaultPhoto;
     private TextView status;
     private LinearLayout tileRail;
@@ -117,6 +123,7 @@ public class MainActivity extends Activity {
     private int defaultPhotoIndex;
     private boolean albumZoomApplied;
     private boolean albumLoadFailed;
+    private boolean hostedTilesLoaded;
     private final Handler ui = new Handler(Looper.getMainLooper());
     private final Random random = new Random();
     private final Runnable hideGear = new Runnable() {
@@ -144,7 +151,11 @@ public class MainActivity extends Activity {
     };
     private final Runnable refreshDashboardTiles = new Runnable() {
         public void run() {
-            refreshDashboardDataAsync();
+            if (useHostedTiles(getSharedPreferences(PREFS, MODE_PRIVATE))) {
+                refreshHostedTiles();
+            } else {
+                refreshDashboardDataAsync();
+            }
             ui.postDelayed(this, nextDashboardRefreshDelayMs());
         }
     };
@@ -191,6 +202,16 @@ public class MainActivity extends Activity {
         albumView.setVisibility(View.GONE);
         root.addView(albumView, new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+
+        hostedTilesView = new WebView(this);
+        configureHostedTilesView();
+        hostedTilesView.setVisibility(View.GONE);
+        hostedTilesView.setClickable(false);
+        hostedTilesView.setFocusable(false);
+        FrameLayout.LayoutParams hostedTilesParams = new FrameLayout.LayoutParams(
+                dp(TILE_RAIL_WIDTH_DP + 36), FrameLayout.LayoutParams.MATCH_PARENT);
+        hostedTilesParams.gravity = Gravity.TOP | Gravity.LEFT;
+        root.addView(hostedTilesView, hostedTilesParams);
 
         status = new TextView(this);
         status.setTextColor(Color.WHITE);
@@ -594,6 +615,7 @@ public class MainActivity extends Activity {
         gear.setVisibility(View.VISIBLE);
         assistant.setVisibility(View.VISIBLE);
         if (tileRail != null) tileRail.bringToFront();
+        if (hostedTilesView != null) hostedTilesView.bringToFront();
         gear.bringToFront();
         assistant.bringToFront();
         ui.removeCallbacks(hideGear);
@@ -603,6 +625,13 @@ public class MainActivity extends Activity {
     private void refreshClockChrome() {
         if (clockChrome == null || tileRail == null) return;
         SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (useHostedTiles(p)) {
+            tileRail.setVisibility(hostedTilesLoaded ? View.GONE : View.VISIBLE);
+            if (hostedTilesView != null) hostedTilesView.setVisibility(View.VISIBLE);
+        } else if (hostedTilesView != null) {
+            hostedTilesView.setVisibility(View.GONE);
+            hostedTilesLoaded = false;
+        }
         Date now = new Date();
         String time = new SimpleDateFormat("h:mm a", Locale.getDefault()).format(now);
         String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(now);
@@ -631,7 +660,11 @@ public class MainActivity extends Activity {
                 || weatherTile.getVisibility() == View.VISIBLE
                 || stocksTile.getVisibility() == View.VISIBLE
                 || birthdaysTile.getVisibility() == View.VISIBLE;
-        tileRail.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+        if (useHostedTiles(p) && hostedTilesLoaded) {
+            tileRail.setVisibility(View.GONE);
+        } else {
+            tileRail.setVisibility(anyVisible ? View.VISIBLE : View.GONE);
+        }
     }
 
     private void applyClockChromeSettings() {
@@ -717,6 +750,53 @@ public class MainActivity extends Activity {
         return gearHidden && assistantHidden;
     }
 
+    private void configureHostedTilesView() {
+        WebSettings s = hostedTilesView.getSettings();
+        s.setJavaScriptEnabled(true);
+        s.setDomStorageEnabled(true);
+        s.setLoadWithOverviewMode(true);
+        s.setUseWideViewPort(true);
+        hostedTilesView.setBackgroundColor(Color.TRANSPARENT);
+        hostedTilesView.setLayerType(View.LAYER_TYPE_SOFTWARE, null);
+        hostedTilesView.setWebViewClient(new WebViewClient() {
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                hostedTilesLoaded = true;
+                refreshClockChrome();
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request != null && !request.isForMainFrame()) return;
+                hostedTilesLoaded = false;
+                if (hostedTilesView != null) hostedTilesView.setVisibility(View.GONE);
+                refreshClockChrome();
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+                if (request != null && !request.isForMainFrame()) return;
+                hostedTilesLoaded = false;
+                if (hostedTilesView != null) hostedTilesView.setVisibility(View.GONE);
+                refreshClockChrome();
+            }
+        });
+    }
+
+    private void refreshHostedTiles() {
+        SharedPreferences p = getSharedPreferences(PREFS, MODE_PRIVATE);
+        if (!useHostedTiles(p) || hostedTilesView == null) {
+            if (hostedTilesView != null) hostedTilesView.setVisibility(View.GONE);
+            return;
+        }
+        hostedTilesView.setVisibility(View.VISIBLE);
+        hostedTilesView.loadUrl(buildHostedTilesUrl(this));
+    }
+
+    private static boolean useHostedTiles(SharedPreferences p) {
+        return TILE_RENDERER_HOSTED.equals(p.getString(KEY_TILE_RENDERER, TILE_RENDERER_NATIVE));
+    }
+
     private void openSettings() {
         ui.removeCallbacks(hideGear);
         startActivityForResult(new Intent(this, SettingsActivity.class), REQ_SETTINGS);
@@ -734,6 +814,9 @@ public class MainActivity extends Activity {
             hideStatus();
             video.stopPlayback();
             hideDefaultPhotos();
+            applyClockChromeSettings();
+            refreshClockChrome();
+            refreshHostedTiles();
             loadAndPlay();
         }
     }
@@ -794,7 +877,7 @@ public class MainActivity extends Activity {
     }
 
     static String getOrCreateDeviceId(Context context) {
-        SharedPreferences p = context.getSharedPreferences(PREFS, MODE_PRIVATE);
+        SharedPreferences p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
         String existing = p.getString(KEY_DEVICE_ID, "");
         if (!TextUtils.isEmpty(existing)) return existing;
 
@@ -873,13 +956,24 @@ public class MainActivity extends Activity {
         String albumUrl = config.optString("albumUrl", config.optString("defaultAlbumUrl", ""));
         String photoHostUrl = config.optString("photoHostUrl", "");
         String assistantUrl = config.optString("assistantUrl", "");
+        String hostedTilesUrl = config.optString("hostedTilesUrl", "");
         String mode = config.optString("mode", config.optString("defaultMode", ""));
         String displayName = config.optString("displayName", "").trim();
+        JSONObject dashboard = config.optJSONObject("dashboard");
 
         if (!TextUtils.isEmpty(displayName)) editor.putString(KEY_DEVICE_FRIENDLY_NAME, displayName);
         if (isValidWebUrl(albumUrl)) editor.putString(KEY_ALBUM_URL, albumUrl);
         if (isValidWebUrl(photoHostUrl)) editor.putString(KEY_PHOTO_HOST_URL, photoHostUrl);
         if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);
+        if (isValidWebUrl(hostedTilesUrl)) editor.putString(KEY_HOSTED_TILES_URL, hostedTilesUrl);
+        if (dashboard != null) {
+            String tileRenderer = dashboard.optString("tileRenderer", TILE_RENDERER_NATIVE);
+            if (TILE_RENDERER_HOSTED.equals(tileRenderer)) {
+                editor.putString(KEY_TILE_RENDERER, TILE_RENDERER_HOSTED);
+            } else if (TILE_RENDERER_NATIVE.equals(tileRenderer)) {
+                editor.putString(KEY_TILE_RENDERER, TILE_RENDERER_NATIVE);
+            }
+        }
         if ("photo_host".equals(mode) || "photo-host".equals(mode)) {
             editor.putInt(KEY_MODE, MODE_PHOTO_HOST);
         } else if ("google_photos".equals(mode) || "google-photos".equals(mode)) {
@@ -933,6 +1027,23 @@ public class MainActivity extends Activity {
             return DEFAULT_DASHBOARD_DATA_URL + "?deviceId=" + URLEncoder.encode(deviceId, "UTF-8");
         } catch (Exception e) {
             return DEFAULT_DASHBOARD_DATA_URL + "?deviceId=" + deviceId;
+        }
+    }
+
+    static String buildHostedTilesUrl(Context context) {
+        SharedPreferences p = context.getSharedPreferences(PREFS, MODE_PRIVATE);
+        String base = p.getString(KEY_HOSTED_TILES_URL, DEFAULT_HOSTED_TILES_URL);
+        String deviceId = getOrCreateDeviceId(context);
+        String accent = p.getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR);
+        String displayName = p.getString(KEY_DEVICE_FRIENDLY_NAME, "");
+        try {
+            String separator = base.contains("?") ? "&" : "?";
+            return base
+                    + separator + "deviceId=" + URLEncoder.encode(deviceId, "UTF-8")
+                    + "&accent=" + URLEncoder.encode(accent, "UTF-8")
+                    + "&name=" + URLEncoder.encode(displayName, "UTF-8");
+        } catch (Exception e) {
+            return base;
         }
     }
 
