@@ -748,9 +748,9 @@ public class MainActivity extends Activity {
         String photoHostUrl = config.optString("photoHostUrl", "");
         String assistantUrl = config.optString("assistantUrl", "");
         String mode = config.optString("mode", config.optString("defaultMode", ""));
-        String friendlyName = config.optString("displayName", config.optString("friendlyName", "")).trim();
+        String displayName = config.optString("displayName", "").trim();
 
-        if (!TextUtils.isEmpty(friendlyName)) editor.putString(KEY_DEVICE_FRIENDLY_NAME, friendlyName);
+        if (!TextUtils.isEmpty(displayName)) editor.putString(KEY_DEVICE_FRIENDLY_NAME, displayName);
         if (isValidWebUrl(albumUrl)) editor.putString(KEY_ALBUM_URL, albumUrl);
         if (isValidWebUrl(photoHostUrl)) editor.putString(KEY_PHOTO_HOST_URL, photoHostUrl);
         if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);

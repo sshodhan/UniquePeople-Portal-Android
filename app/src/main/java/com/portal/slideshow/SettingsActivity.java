@@ -43,7 +43,7 @@ public class SettingsActivity extends Activity {
     private EditText photoHostUrlField;
     private EditText assistantUrlField;
     private EditText pairingUrlField;
-    private EditText friendlyNameField;
+    private EditText displayNameField;
     private EditText clockSizeField;
     private ImageView pairingQr;
     private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
@@ -60,7 +60,7 @@ public class SettingsActivity extends Activity {
         String albumUrl = MainActivity.getAlbumUrl(p);
         String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
         String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
-        String friendlyName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
+        String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
         String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
         int clockSize = p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP);
         int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
@@ -96,8 +96,8 @@ public class SettingsActivity extends Activity {
         phoneSetup.addView(readOnlyValue(deviceId), wide(dp(4)));
         phoneSetup.addView(help("This ID is unique to this Portal. Web settings saved for other Portals will not affect this one."));
         phoneSetup.addView(fieldLabel("Friendly device name"));
-        friendlyNameField = readOnlyValue(TextUtils.isEmpty(friendlyName) ? "Not set yet" : friendlyName);
-        phoneSetup.addView(friendlyNameField, wide(dp(4)));
+        displayNameField = readOnlyValue(TextUtils.isEmpty(displayName) ? "Not set yet" : displayName);
+        phoneSetup.addView(displayNameField, wide(dp(4)));
         phoneSetup.addView(help("Set this on the web companion so each family Portal is easy to recognize."));
         phoneSetup.addView(help(lastRemoteRefreshText(p)));
 
@@ -264,9 +264,9 @@ public class SettingsActivity extends Activity {
         albumUrlField.setText(MainActivity.getAlbumUrl(p));
         photoHostUrlField.setText(p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL));
         assistantUrlField.setText(p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL));
-        if (friendlyNameField != null) {
-            String friendlyName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
-            friendlyNameField.setText(TextUtils.isEmpty(friendlyName) ? "Not set yet" : friendlyName);
+        if (displayNameField != null) {
+            String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
+            displayNameField.setText(TextUtils.isEmpty(displayName) ? "Not set yet" : displayName);
         }
         if (clockSizeField != null) {
             clockSizeField.setText(String.valueOf(p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP)));
