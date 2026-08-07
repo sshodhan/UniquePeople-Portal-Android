@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
     static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 42;
     static final int MIN_CLOCK_TEXT_SIZE_SP = 24;
     static final int MAX_CLOCK_TEXT_SIZE_SP = 72;
-    static final int TILE_RAIL_WIDTH_DP = 260;
+    static final int TILE_RAIL_WIDTH_DP = 340;
     static final int MODE_BUNDLED = 0;
     static final int MODE_STREAM = 1;
     static final int MODE_DOWNLOAD = 2;
@@ -597,7 +597,7 @@ public class MainActivity extends Activity {
         String day = new SimpleDateFormat("EEE", Locale.getDefault()).format(now);
         String date = new SimpleDateFormat("MMM d", Locale.getDefault()).format(now);
         String year = new SimpleDateFormat("yyyy", Locale.getDefault()).format(now);
-        String clockText = time + "\n" + day + "\n" + date + "\n" + year;
+        String clockText = time + "\n" + day + "  " + date + "\n" + year;
         SpannableString clockSpan = new SpannableString(clockText);
         int secondaryStart = time.length() + 1;
         clockSpan.setSpan(new RelativeSizeSpan(0.5f), secondaryStart, clockText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -663,7 +663,7 @@ public class MainActivity extends Activity {
     private LinearLayout createTileGroup() {
         LinearLayout group = new LinearLayout(this);
         group.setOrientation(LinearLayout.VERTICAL);
-        group.setPadding(dp(8), dp(6), dp(8), dp(6));
+        group.setPadding(dp(12), dp(12), dp(12), dp(12));
         return group;
     }
 
@@ -932,12 +932,15 @@ public class MainActivity extends Activity {
         int temp = weather.optInt("temperatureF", Integer.MIN_VALUE);
         int high = weather.optInt("highF", Integer.MIN_VALUE);
         int low = weather.optInt("lowF", Integer.MIN_VALUE);
+        String warning = weather.optString("warning",
+                weather.optString("alert", ""));
         StringBuilder out = new StringBuilder();
         out.append(TextUtils.isEmpty(icon) ? "Weather" : icon).append(" ").append(condition);
-        if (temp != Integer.MIN_VALUE) out.append("\n").append(temp).append("°F");
+        if (temp != Integer.MIN_VALUE) out.append("  ").append(temp).append("°F");
         if (high != Integer.MIN_VALUE && low != Integer.MIN_VALUE) {
             out.append("\nH ").append(high).append("  L ").append(low);
         }
+        out.append("\n").append(TextUtils.isEmpty(warning) ? "No alerts" : warning);
         return out.toString();
     }
 
@@ -1015,7 +1018,7 @@ public class MainActivity extends Activity {
         TextView header = new TextView(this);
         header.setTypeface(Typeface.MONOSPACE, Typeface.BOLD);
         header.setTextColor(safeColor(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR)));
-        header.setTextSize(9f);
+        header.setTextSize(13f);
         header.setIncludeFontPadding(false);
         header.setText(text);
         stocksTile.addView(header, new LinearLayout.LayoutParams(
@@ -1037,7 +1040,7 @@ public class MainActivity extends Activity {
 
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
-        card.setPadding(featured ? dp(8) : dp(6), featured ? dp(5) : dp(4), featured ? dp(8) : dp(6), featured ? dp(5) : dp(4));
+        card.setPadding(featured ? dp(14) : dp(10), featured ? dp(14) : dp(10), featured ? dp(14) : dp(10), featured ? dp(14) : dp(10));
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(Color.argb(132, 8, 10, 18));
         bg.setStroke(dp(1), Color.argb(180, Color.red(accent), Color.green(accent), Color.blue(accent)));
@@ -1048,27 +1051,27 @@ public class MainActivity extends Activity {
         top.setOrientation(LinearLayout.HORIZONTAL);
         top.setGravity(Gravity.CENTER_VERTICAL);
 
-        TextView title = stockText(featured ? symbol : symbol.replace("^", ""), featured ? 10f : 7f, Color.LTGRAY);
+        TextView title = stockText(featured ? symbol : symbol.replace("^", ""), featured ? 16f : 12f, Color.LTGRAY);
         top.addView(title, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
 
-        TextView pill = stockText("GOOD", featured ? 8f : 6f, accent);
+        TextView pill = stockText("GOOD", featured ? 12f : 10f, accent);
         pill.setGravity(Gravity.CENTER);
         GradientDrawable pillBg = new GradientDrawable();
         pillBg.setColor(Color.argb(72, Color.red(accent), Color.green(accent), Color.blue(accent)));
         pillBg.setStroke(dp(1), accent);
         pillBg.setCornerRadius(dp(5));
         pill.setBackground(pillBg);
-        pill.setPadding(dp(6), dp(2), dp(6), dp(2));
+        pill.setPadding(dp(8), dp(3), dp(8), dp(3));
         top.addView(pill, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
-        TextView priceView = stockText(price, featured ? 17f : 10f, Color.WHITE);
+        TextView priceView = stockText(price, featured ? 34f : 18f, Color.WHITE);
         bottom.addView(priceView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         String arrow = "down".equals(direction) ? "▼ " : ("flat".equals(direction) ? "" : "▲ ");
         int trendColor = "down".equals(direction) ? Color.rgb(255, 83, 112) : accent;
-        TextView trend = stockText(arrow + percent, featured ? 14f : 9f, trendColor);
+        TextView trend = stockText(arrow + percent, featured ? 22f : 14f, trendColor);
         bottom.addView(trend, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         card.addView(top);
@@ -1079,7 +1082,7 @@ public class MainActivity extends Activity {
     private LinearLayout.LayoutParams stockSubTileParams() {
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(4);
+        params.topMargin = dp(10);
         return params;
     }
 
