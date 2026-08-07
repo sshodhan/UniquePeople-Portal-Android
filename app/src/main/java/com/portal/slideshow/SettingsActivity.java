@@ -73,28 +73,31 @@ public class SettingsActivity extends Activity {
         col.setPadding(pad, pad, pad, pad);
         scroll.addView(col);
 
-        col.addView(title("UniquePeople Display Settings"));
-        col.addView(label("Choose what UniquePeople shows. If the web settings site is unavailable, this Portal keeps using its saved settings, then falls back to the built-in defaults."));
-        addClockDisplaySettings(col, clockColor, clockSize);
-
         final String deviceId = MainActivity.getOrCreateDeviceId(this);
         final String pairingUrl = MainActivity.buildPairingUrl(this);
-        col.addView(sectionTitle("Pair This Portal"));
-        col.addView(fieldLabel("Portal device ID"));
-        col.addView(readOnlyValue(deviceId), wide(dp(4)));
-        col.addView(help("This ID is unique to this Portal. Scan the QR code with your phone to manage only this device. The Portal does not need the website to start; it only uses the website to update settings."));
-        col.addView(help(lastRemoteRefreshText(p)));
 
+        col.addView(title("UniquePeople Settings"));
+        col.addView(label("Set up this Portal in a few steps. Start with your phone, then refresh here and save."));
+
+        LinearLayout phoneSetup = addExpandableSection(col, "1. Use Your Phone",
+                "Scan the QR code with your phone, choose the album on the web page, then tap Refresh from Web here.",
+                true);
+        phoneSetup.addView(help("Best for family setup. The QR code opens the web companion for only this Portal."));
         pairingQr = new ImageView(this);
         pairingQr.setBackgroundColor(Color.WHITE);
         pairingQr.setPadding(dp(10), dp(10), dp(10), dp(10));
         pairingQr.setAdjustViewBounds(true);
-        col.addView(pairingQr, imageBox(dp(8)));
+        phoneSetup.addView(pairingQr, imageBox(dp(8)));
         loadPairingQr(pairingUrl);
 
-        col.addView(fieldLabel("Phone setup link"));
+        phoneSetup.addView(fieldLabel("Portal device ID"));
+        phoneSetup.addView(readOnlyValue(deviceId), wide(dp(4)));
+        phoneSetup.addView(help("This ID is unique to this Portal. Web settings saved for other Portals will not affect this one."));
+        phoneSetup.addView(help(lastRemoteRefreshText(p)));
+
+        phoneSetup.addView(fieldLabel("Phone setup link"));
         pairingUrlField = readOnlyValue(pairingUrl);
-        col.addView(pairingUrlField, wide(dp(4)));
+        phoneSetup.addView(pairingUrlField, wide(dp(4)));
 
         Button copyPairing = bigButton("Copy phone setup link", "#00796B");
         copyPairing.setOnClickListener(new View.OnClickListener() {
@@ -104,15 +107,7 @@ public class SettingsActivity extends Activity {
                 Toast.makeText(SettingsActivity.this, "Pairing link copied.", Toast.LENGTH_SHORT).show();
             }
         });
-        col.addView(copyPairing, wide(dp(8)));
-
-        Button openPairing = bigButton("Open setup page on this Portal", "#33394A");
-        openPairing.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pairingUrl)));
-            }
-        });
-        col.addView(openPairing, wide(dp(8)));
+        phoneSetup.addView(copyPairing, wide(dp(8)));
 
         Button refreshRemote = bigButton("Refresh settings from web", "#2F6BFF");
         refreshRemote.setOnClickListener(new View.OnClickListener() {
@@ -127,11 +122,13 @@ public class SettingsActivity extends Activity {
                 });
             }
         });
-        col.addView(refreshRemote, wide(dp(12)));
+        phoneSetup.addView(refreshRemote, wide(dp(12)));
 
-        col.addView(sectionTitle("Photo Source"));
-        col.addView(fieldLabel("Shared Google Photos or Drive link"));
-        col.addView(help("Optional. Paste a public/shared album or folder link. This is the main way each user customizes the app without changing the APK."));
+        LinearLayout albumSetup = addExpandableSection(col, "2. Scan Album QR or Paste Link",
+                "Use the Portal camera to scan a Google Photos album QR code, or paste the shared album link directly.",
+                false);
+        albumSetup.addView(fieldLabel("Shared Google Photos or Drive link"));
+        albumSetup.addView(help("Optional. Paste a public/shared album or folder link. This path works even without the web companion."));
         albumUrlField = new EditText(this);
         albumUrlField.setHint("https://photos.app.goo.gl/... or https://drive.google.com/...");
         albumUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
@@ -140,18 +137,35 @@ public class SettingsActivity extends Activity {
         albumUrlField.setHintTextColor(Color.parseColor("#7A8090"));
         albumUrlField.setTextSize(18f);
         albumUrlField.setMinHeight(dp(64));
-        col.addView(albumUrlField, wide(dp(4)));
+        albumSetup.addView(albumUrlField, wide(dp(4)));
 
-        Button scanQr = bigButton("Scan QR code with Portal camera", "#00796B");
+        Button scanQr = bigButton("Scan Album QR Code", "#00796B");
         scanQr.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) {
                 startActivityForResult(new Intent(SettingsActivity.this, QrScanActivity.class), REQ_QR_SCAN);
             }
         });
-        col.addView(scanQr, wide(dp(10)));
+        albumSetup.addView(scanQr, wide(dp(10)));
 
-        col.addView(sectionTitle("Display Mode"));
-        col.addView(help("Direct shared-link mode is best for most people. Use Photo Host only if you have a separate website that renders the album."));
+        LinearLayout display = addExpandableSection(col, "Display",
+                "Adjust the clock overlay that appears over the photos.",
+                false);
+        addClockDisplaySettings(display, clockColor, clockSize);
+
+        LinearLayout advanced = addExpandableSection(col, "Advanced",
+                "Website viewer, assistant, and legacy video fallback options.",
+                false);
+
+        Button openPairing = bigButton("Open setup page on this Portal", "#33394A");
+        openPairing.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pairingUrl)));
+            }
+        });
+        advanced.addView(openPairing, wide(dp(8)));
+
+        advanced.addView(sectionTitle("Display Mode"));
+        advanced.addView(help("Direct shared-link mode is best for most people. Use Photo Host only if you have a separate website that renders the album."));
         RadioGroup group = new RadioGroup(this);
         rGooglePhotos = radio("Open shared Google Photos or Drive link directly");
         rPhotoHost = radio("Load through Photo Host viewer (advanced)");
@@ -165,11 +179,11 @@ public class SettingsActivity extends Activity {
             rBundled = radio("Use the built-in video");
             group.addView(rBundled);
         }
-        col.addView(group, wide(dp(8)));
+        advanced.addView(group, wide(dp(8)));
 
-        col.addView(sectionTitle("Advanced Website Viewer"));
-        col.addView(fieldLabel("Photo Host viewer URL"));
-        col.addView(help("Optional. Only used when Photo Host mode is selected. The app opens this URL with albumUrl=<your shared link>."));
+        advanced.addView(sectionTitle("Advanced Website Viewer"));
+        advanced.addView(fieldLabel("Photo Host viewer URL"));
+        advanced.addView(help("Optional. Only used when Photo Host mode is selected. The app opens this URL with albumUrl=<your shared link>."));
         photoHostUrlField = new EditText(this);
         photoHostUrlField.setHint(MainActivity.DEFAULT_PHOTO_HOST_URL);
         photoHostUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
@@ -178,11 +192,11 @@ public class SettingsActivity extends Activity {
         photoHostUrlField.setHintTextColor(Color.parseColor("#7A8090"));
         photoHostUrlField.setTextSize(18f);
         photoHostUrlField.setMinHeight(dp(64));
-        col.addView(photoHostUrlField, wide(dp(4)));
+        advanced.addView(photoHostUrlField, wide(dp(4)));
 
-        col.addView(sectionTitle("Video Fallback"));
-        col.addView(fieldLabel("Video URL"));
-        col.addView(help("Optional. Used only for Stream or Download video modes. Leave blank for photo modes and default photos."));
+        advanced.addView(sectionTitle("Video Fallback"));
+        advanced.addView(fieldLabel("Video URL"));
+        advanced.addView(help("Optional. Used only for Stream or Download video modes. Leave blank for photo modes and default photos."));
         urlField = new EditText(this);
         urlField.setHint("https://example.com/family.mp4");
         urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
@@ -191,7 +205,7 @@ public class SettingsActivity extends Activity {
         urlField.setHintTextColor(Color.parseColor("#7A8090"));
         urlField.setTextSize(18f);
         urlField.setMinHeight(dp(64));
-        col.addView(urlField, wide(dp(4)));
+        advanced.addView(urlField, wide(dp(4)));
 
         if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
         else if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
@@ -199,9 +213,9 @@ public class SettingsActivity extends Activity {
         else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
         else rStream.setChecked(true);
 
-        col.addView(sectionTitle("Portal Assistant"));
-        col.addView(fieldLabel("Assistant web app URL"));
-        col.addView(help("Optional. This should point to the browser assistant app. API keys stay on that server, not inside this Android APK."));
+        advanced.addView(sectionTitle("Portal Assistant"));
+        advanced.addView(fieldLabel("Assistant web app URL"));
+        advanced.addView(help("Optional. This should point to the browser assistant app. API keys stay on that server, not inside this Android APK."));
 
         assistantUrlField = new EditText(this);
         assistantUrlField.setHint(MainActivity.DEFAULT_ASSISTANT_URL);
@@ -211,7 +225,7 @@ public class SettingsActivity extends Activity {
         assistantUrlField.setHintTextColor(Color.parseColor("#7A8090"));
         assistantUrlField.setTextSize(18f);
         assistantUrlField.setMinHeight(dp(64));
-        col.addView(assistantUrlField, wide(dp(4)));
+        advanced.addView(assistantUrlField, wide(dp(4)));
 
         Button openAssistant = bigButton("Open Assistant", "#00796B");
         openAssistant.setOnClickListener(new View.OnClickListener() {
@@ -221,7 +235,7 @@ public class SettingsActivity extends Activity {
                 }
             }
         });
-        col.addView(openAssistant, wide(dp(16)));
+        advanced.addView(openAssistant, wide(dp(16)));
 
         Button save = bigButton("Save & Play", "#2F6BFF");
         save.setOnClickListener(new View.OnClickListener() {
@@ -466,6 +480,40 @@ public class SettingsActivity extends Activity {
     }
 
     // ---- tiny view helpers ----
+    private LinearLayout addExpandableSection(LinearLayout parent, final String title, String summary, boolean expanded) {
+        final LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        content.setVisibility(expanded ? View.VISIBLE : View.GONE);
+
+        final Button header = new Button(this);
+        header.setAllCaps(false);
+        header.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        header.setTextSize(20f);
+        header.setTextColor(Color.WHITE);
+        header.setBackgroundColor(Color.parseColor("#202638"));
+        header.setPadding(dp(14), 0, dp(14), 0);
+        header.setMinHeight(dp(64));
+        header.setText((expanded ? "v  " : ">  ") + title);
+        header.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) {
+                boolean show = content.getVisibility() != View.VISIBLE;
+                content.setVisibility(show ? View.VISIBLE : View.GONE);
+                header.setText((show ? "v  " : ">  ") + title);
+            }
+        });
+        parent.addView(header, wide(dp(18)));
+
+        if (!TextUtils.isEmpty(summary)) {
+            TextView summaryView = help(summary);
+            summaryView.setPadding(dp(10), dp(8), dp(10), dp(2));
+            parent.addView(summaryView);
+        }
+
+        content.setPadding(dp(10), dp(8), dp(10), dp(8));
+        parent.addView(content);
+        return content;
+    }
+
     private TextView title(String t) {
         TextView v = new TextView(this);
         v.setText(t);
