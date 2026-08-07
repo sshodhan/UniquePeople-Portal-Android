@@ -4,7 +4,10 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -1036,6 +1039,7 @@ public class MainActivity extends Activity {
         String price = parts[1];
         String percent = parts[2];
         String direction = parts[3];
+        String sparkline = parts.length > 4 ? parts[4] : "";
         int accent = safeColor(getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_CLOCK_COLOR, DEFAULT_CLOCK_COLOR));
 
         LinearLayout card = new LinearLayout(this);
@@ -1067,7 +1071,7 @@ public class MainActivity extends Activity {
         LinearLayout bottom = new LinearLayout(this);
         bottom.setOrientation(LinearLayout.HORIZONTAL);
         bottom.setGravity(Gravity.CENTER_VERTICAL);
-        TextView priceView = stockText(price, featured ? 34f : 18f, Color.WHITE);
+        TextView priceView = stockText(compactPrice(price), featured ? 34f : 18f, Color.WHITE);
         bottom.addView(priceView, new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
         String arrow = "down".equals(direction) ? "▼ " : ("flat".equals(direction) ? "" : "▲ ");
         int trendColor = "down".equals(direction) ? Color.rgb(255, 83, 112) : accent;
@@ -1076,6 +1080,8 @@ public class MainActivity extends Activity {
 
         card.addView(top);
         card.addView(bottom);
+        card.addView(new StockSparklineView(this, sparkline, trendColor), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, featured ? dp(42) : dp(26)));
         return card;
     }
 
@@ -1096,6 +1102,12 @@ public class MainActivity extends Activity {
         return view;
     }
 
+    private static String compactPrice(String price) {
+        if (TextUtils.isEmpty(price) || "--".equals(price)) return price;
+        int dot = price.indexOf('.');
+        return dot > 0 ? price.substring(0, dot) : price;
+    }
+
     private static void appendQuote(StringBuilder out, JSONObject quote, String label) {
         if (quote == null) return;
         String symbol = quote.optString("symbol", quote.optString("label", "")).trim();
@@ -1103,10 +1115,71 @@ public class MainActivity extends Activity {
         String percent = quote.optString("dayReturnPercent", "--");
         String price = quote.optString("price", "");
         String direction = quote.optString("direction", "flat");
+        String sparkline = encodeMonthSparkline(quote.optJSONObject("sparkline"));
         if (TextUtils.isEmpty(symbol)) return;
         if (!TextUtils.isEmpty(price) && !price.startsWith("$")) price = "$" + price;
         if (out.length() > 0) out.append("\n");
-        out.append(symbol).append("|").append(price).append("|").append(percent).append("|").append(direction);
+        out.append(symbol).append("|").append(price).append("|").append(percent).append("|").append(direction).append("|").append(sparkline);
+    }
+
+    private static String encodeMonthSparkline(JSONObject sparkline) {
+        if (sparkline == null) return "";
+        JSONArray month = sparkline.optJSONArray("month");
+        if (month == null || month.length() == 0) return "";
+        StringBuilder out = new StringBuilder();
+        for (int i = 0; i < month.length(); i++) {
+            if (i > 0) out.append(",");
+            out.append(month.optInt(i));
+        }
+        return out.toString();
+    }
+
+    private static final class StockSparklineView extends View {
+        private final float[] points;
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+
+        StockSparklineView(Context context, String csv, int color) {
+            super(context);
+            points = parsePoints(csv);
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            super.onDraw(canvas);
+            if (points.length < 2) return;
+            float width = getWidth() - getPaddingLeft() - getPaddingRight();
+            float height = getHeight() - getPaddingTop() - getPaddingBottom();
+            if (width <= 0 || height <= 0) return;
+            paint.setStrokeWidth(Math.max(2f, height / 10f));
+            Path path = new Path();
+            for (int i = 0; i < points.length; i++) {
+                float x = getPaddingLeft() + (width * i / (points.length - 1));
+                float y = getPaddingTop() + height - (height * points[i] / 100f);
+                if (i == 0) path.moveTo(x, y);
+                else path.lineTo(x, y);
+            }
+            canvas.drawPath(path, paint);
+        }
+
+        private static float[] parsePoints(String csv) {
+            if (TextUtils.isEmpty(csv)) return new float[0];
+            String[] parts = csv.split(",");
+            float[] parsed = new float[parts.length];
+            int count = 0;
+            for (String part : parts) {
+                try {
+                    float value = Float.parseFloat(part.trim());
+                    if (value < 0f) value = 0f;
+                    if (value > 100f) value = 100f;
+                    parsed[count++] = value;
+                } catch (Exception ignored) { }
+            }
+            return count == parsed.length ? parsed : Arrays.copyOf(parsed, count);
+        }
     }
 
     private static boolean isValidWebUrl(String url) {
