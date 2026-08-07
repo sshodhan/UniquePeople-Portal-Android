@@ -967,7 +967,7 @@ public class MainActivity extends Activity {
         if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);
         if (isValidWebUrl(hostedTilesUrl)) editor.putString(KEY_HOSTED_TILES_URL, hostedTilesUrl);
         if (dashboard != null) {
-            String tileRenderer = dashboard.optString("tileRenderer", TILE_RENDERER_NATIVE);
+            String tileRenderer = dashboard.optString("tileRenderer", "");
             if (TILE_RENDERER_HOSTED.equals(tileRenderer)) {
                 editor.putString(KEY_TILE_RENDERER, TILE_RENDERER_HOSTED);
             } else if (TILE_RENDERER_NATIVE.equals(tileRenderer)) {
