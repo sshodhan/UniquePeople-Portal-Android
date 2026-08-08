@@ -66,6 +66,35 @@ The debug APK is still written to:
 app-debug.apk
 ```
 
+## Portal Release-Candidate Loop
+
+For day-to-day testing on the developer Portal after it has been moved onto the release-signed line, use the helper script:
+
+```bash
+scripts/install-release-candidate.sh -s 818PGA02P120ML06
+```
+
+The script:
+
+1. Loads `/Users/saralshodhan/projects/Release/UniquePeopleRelease/secure/release.env`.
+2. Builds `app-release.apk` without the bundled personal video.
+3. Records the installed package metadata.
+4. Pulls the currently installed APK into the release rollback folder if one exists.
+5. Installs the new release-signed APK with `adb install -r`.
+6. Launches UniquePeople.
+
+If exactly one physical Portal is connected, the serial can be omitted:
+
+```bash
+scripts/install-release-candidate.sh
+```
+
+To reinstall the existing `app-release.apk` without rebuilding:
+
+```bash
+scripts/install-release-candidate.sh -s 818PGA02P120ML06 --skip-build
+```
+
 ## Verify Signing
 
 Use the Android SDK build-tools `apksigner`:
