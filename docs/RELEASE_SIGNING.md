@@ -14,14 +14,15 @@ Changing signing certificates creates a different trust line. A debug-signed V1/
 
 ## One-Time Keystore Creation
 
-Create the keystore outside the git repo:
+Create the keystore outside the app git repo, under the shared release area:
 
 ```bash
-mkdir -p /Users/saralshodhan/secure/uniquepeople
+mkdir -p /Users/saralshodhan/projects/Release/UniquePeopleRelease/secure
+chmod 700 /Users/saralshodhan/projects/Release/UniquePeopleRelease/secure
 
 keytool -genkeypair \
   -v \
-  -keystore /Users/saralshodhan/secure/uniquepeople/uniquepeople-release.jks \
+  -keystore /Users/saralshodhan/projects/Release/UniquePeopleRelease/secure/uniquepeople-release.jks \
   -alias uniquepeople \
   -keyalg RSA \
   -keysize 4096 \
@@ -35,7 +36,7 @@ Record the keystore password and key password in a password manager. Do not comm
 Set these environment variables before building:
 
 ```bash
-export UNIQUEPEOPLE_KEYSTORE=/Users/saralshodhan/secure/uniquepeople/uniquepeople-release.jks
+export UNIQUEPEOPLE_KEYSTORE=/Users/saralshodhan/projects/Release/UniquePeopleRelease/secure/uniquepeople-release.jks
 export UNIQUEPEOPLE_KEY_ALIAS=uniquepeople
 export UNIQUEPEOPLE_KEYSTORE_PASSWORD='REPLACE_WITH_KEYSTORE_PASSWORD'
 export UNIQUEPEOPLE_KEY_PASSWORD='REPLACE_WITH_KEY_PASSWORD'
