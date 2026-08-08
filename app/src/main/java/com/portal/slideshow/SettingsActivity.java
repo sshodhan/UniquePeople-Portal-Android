@@ -51,6 +51,9 @@ public class SettingsActivity extends Activity {
     private TextView setupNav, advancedNav, sideDevice, sideStatus;
     private RadioButton nativeMode, webMode;
     private EditText photoHostField, videoField, assistantField;
+    private EditText issueTitleField, issueDetailsField;
+    private RadioButton sevLow, sevMedium, sevHigh, sevCritical;
+    private TextView issueStatus;
     private PortalSettings draft;
     private boolean advanced;
     private boolean albumScanned;
@@ -172,8 +175,46 @@ public class SettingsActivity extends Activity {
         right.addView(txt("●  " + (draft.assistantConnected ? "Assistant connected" : "Assistant not connected"), 14, draft.assistantConnected ? GREEN : MUTED, false), top(18));
         Button open = button("Open Assistant", true); open.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openAssistant(); }}); LinearLayout.LayoutParams openLp = full(); openLp.height = dp(56); openLp.topMargin = dp(24); right.addView(open, openLp);
         LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, -2, 1); leftLp.rightMargin = dp(10); LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(0, -2, 1); rightLp.leftMargin = dp(10);
-        cards.addView(left, leftLp); cards.addView(right, rightLp); content.addView(cards, top(34)); mount(content);
+        cards.addView(left, leftLp); cards.addView(right, rightLp); content.addView(cards, top(34));
+        content.addView(reportCard(), top(20)); mount(content);
     }
+
+    private View reportCard() {
+        LinearLayout card = advancedCard("SUPPORT", "Report a Problem");
+        card.addView(txt("Files a ticket into the UniquePeople Linear project with this Portal's details attached. Reports go through the web companion server — no account or API key lives on this Portal.", 14, MUTED, false), top(10));
+        issueTitleField = input("Problem summary", "Short summary of the problem", "");
+        card.addView(fieldLabel("What's wrong?"), top(22)); card.addView(issueTitleField, inputParams());
+        issueDetailsField = input("Problem details", "What happened, and what did you expect?", "");
+        issueDetailsField.setSingleLine(false); issueDetailsField.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_MULTI_LINE); issueDetailsField.setGravity(Gravity.TOP); issueDetailsField.setPadding(dp(16), dp(12), dp(16), dp(12));
+        LinearLayout.LayoutParams detailsLp = full(); detailsLp.height = dp(110); detailsLp.topMargin = dp(8);
+        card.addView(fieldLabel("Details (optional)"), top(18)); card.addView(issueDetailsField, detailsLp);
+        card.addView(fieldLabel("How bad is it?"), top(18));
+        RadioGroup severity = new RadioGroup(this);
+        sevLow = radio("Low - minor annoyance"); sevMedium = radio("Medium - something is off"); sevHigh = radio("High - a feature is broken"); sevCritical = radio("Critical - the Portal is unusable");
+        severity.addView(sevLow); severity.addView(sevMedium); severity.addView(sevHigh); severity.addView(sevCritical); sevMedium.setChecked(true);
+        card.addView(severity, top(6));
+        final Button send = button("Send report", true);
+        send.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { sendReport(send); }});
+        LinearLayout.LayoutParams sendLp = full(); sendLp.height = dp(56); sendLp.topMargin = dp(20); card.addView(send, sendLp);
+        issueStatus = txt("Reports include the device ID, app version, and display mode.", 13, MUTED, false);
+        card.addView(issueStatus, top(12));
+        return card;
+    }
+
+    private void sendReport(final Button send) {
+        String title = value(issueTitleField);
+        if (empty(title)) { issueStatus.setText("Add a short summary of the problem first."); return; }
+        send.setEnabled(false); issueStatus.setText("Sending report...");
+        IssueReporter.reportAsync(this, title, value(issueDetailsField), selectedSeverity(), new IssueReporter.Callback() {
+            public void onComplete(boolean success, String message, String issueUrl) {
+                send.setEnabled(true); issueStatus.setText(message);
+                if (success) { issueTitleField.setText(""); issueDetailsField.setText(""); }
+                Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private String selectedSeverity() { if (sevCritical.isChecked()) return "critical"; if (sevHigh.isChecked()) return "high"; if (sevLow.isChecked()) return "low"; return "medium"; }
 
     private void mount(LinearLayout content) {
         FrameLayout page = new FrameLayout(this); page.setBackgroundColor(BG);

@@ -87,6 +87,7 @@ public class MainActivity extends Activity {
     static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
+    static final String DEFAULT_REPORT_ISSUE_URL = "https://uniquepeople-web.vercel.app/api/report-issue";
     static final String DEFAULT_CLOCK_COLOR = "#39FF14";
     static final String DEFAULT_WEATHER_LOCATION = "Vienna, VA";
     static final String DEFAULT_WEATHER_TILE_TEXT = "Weather\nVienna, VA\nWaiting for data";
