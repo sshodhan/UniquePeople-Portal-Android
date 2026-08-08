@@ -6,6 +6,7 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -122,6 +123,13 @@ public class AssistantActivity extends Activity {
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
         String url = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL).trim();
         if (url.length() == 0) url = MainActivity.DEFAULT_ASSISTANT_URL;
+        Uri assistantUri = Uri.parse(url);
+        if (assistantUri.getQueryParameter("deviceId") == null) {
+            url = assistantUri.buildUpon()
+                    .appendQueryParameter("deviceId", MainActivity.getOrCreateDeviceId(this))
+                    .build()
+                    .toString();
+        }
         status.setText("Loading assistant...");
         status.setVisibility(View.VISIBLE);
         webView.loadUrl(url);
