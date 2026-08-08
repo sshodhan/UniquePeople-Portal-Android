@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.View;
@@ -15,7 +16,6 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -51,18 +51,28 @@ public class AssistantActivity extends Activity {
         slp.gravity = Gravity.CENTER;
         root.addView(status, slp);
 
-        Button close = new Button(this);
-        close.setText("Close");
-        close.setTextSize(18f);
-        close.setAllCaps(false);
+        TextView close = new TextView(this);
+        close.setText("X");
+        close.setContentDescription("Close assistant");
+        close.setGravity(Gravity.CENTER);
+        close.setTextColor(Color.WHITE);
+        close.setTextSize(22f);
+        close.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+        close.setClickable(true);
+        close.setFocusable(true);
+        GradientDrawable closeBg = new GradientDrawable();
+        closeBg.setShape(GradientDrawable.OVAL);
+        closeBg.setColor(Color.argb(170, 7, 16, 19));
+        closeBg.setStroke(dp(1), Color.argb(60, 255, 255, 255));
+        close.setBackground(closeBg);
         close.setOnClickListener(new View.OnClickListener() {
             public void onClick(View v) { finish(); }
         });
         FrameLayout.LayoutParams clp = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                dp(52), dp(52));
         clp.gravity = Gravity.TOP | Gravity.RIGHT;
-        clp.topMargin = dp(24);
-        clp.rightMargin = dp(24);
+        clp.topMargin = dp(14);
+        clp.rightMargin = dp(14);
         root.addView(close, clp);
 
         setContentView(root);
