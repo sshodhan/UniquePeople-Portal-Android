@@ -1,25 +1,23 @@
 package com.portal.slideshow;
 
 import android.app.Activity;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.net.Uri;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
@@ -28,698 +26,252 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.URLEncoder;
-import java.net.URL;
-import java.text.DateFormat;
-import java.util.Date;
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.common.BitMatrix;
+import com.google.zxing.qrcode.QRCodeWriter;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
+/** Figma Page 3 settings shell. V1 preferences remain the persistence contract. */
 public class SettingsActivity extends Activity {
-
     private static final int REQ_QR_SCAN = 42;
+    private static final int BG = Color.rgb(14, 17, 24);
+    private static final int SIDE = Color.rgb(9, 11, 16);
+    private static final int CARD = Color.rgb(18, 21, 30);
+    private static final int BORDER = Color.rgb(34, 42, 60);
+    private static final int TEXT = Color.rgb(245, 247, 255);
+    private static final int MUTED = Color.rgb(168, 181, 204);
+    private static final int TEAL = Color.rgb(31, 184, 173);
+    private static final int GREEN = Color.rgb(77, 214, 143);
 
-    private EditText urlField;
-    private EditText albumUrlField;
-    private EditText photoHostUrlField;
-    private EditText assistantUrlField;
-    private EditText hostedTilesUrlField;
-    private EditText pairingUrlField;
-    private EditText displayNameField;
-    private EditText clockSizeField;
-    private ImageView pairingQr;
-    private RadioButton rPhotoHost, rGooglePhotos, rStream, rDownload, rBundled;
-    private RadioButton rTileNative, rTileHosted;
-    private RadioButton rClockGreen, rClockWhite, rClockAmber, rClockCyan;
-    private CheckBox tileClock, tileWeather, tileStocks, tileGreeting, tileBirthdays;
-    private final Handler ui = new Handler(Looper.getMainLooper());
+    private FrameLayout contentHost;
+    private TextView setupNav, advancedNav, sideDevice, sideStatus;
+    private RadioButton nativeMode, webMode;
+    private EditText photoHostField, videoField, assistantField;
+    private PortalSettings draft;
+    private boolean advanced;
+    private boolean albumScanned;
+    private final Set<String> enabledTiles = new HashSet<String>();
+    private final Map<String, TextView> chips = new HashMap<String, TextView>();
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setTitle("UniquePeople V2 Settings");
-
-        SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
-        String url = p.getString(MainActivity.KEY_URL, "");
-        String albumUrl = MainActivity.getAlbumUrl(p);
-        String photoHostUrl = p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL);
-        String assistantUrl = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
-        String hostedTilesUrl = p.getString(MainActivity.KEY_HOSTED_TILES_URL, MainActivity.DEFAULT_HOSTED_TILES_URL);
-        String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
-        String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
-        int clockSize = p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP);
-        boolean showClock = p.getBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, true);
-        boolean showWeather = p.getBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, false);
-        boolean showStocks = p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false);
-        boolean showGreeting = p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, false);
-        boolean showBirthdays = p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false);
-        String tileRenderer = p.getString(MainActivity.KEY_TILE_RENDERER, MainActivity.TILE_RENDERER_NATIVE);
-        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
-        boolean hasBundled = hasBundledVideo();
-
-        ScrollView scroll = new ScrollView(this);
-        scroll.setBackgroundColor(Color.parseColor("#10131A"));
-
-        LinearLayout col = new LinearLayout(this);
-        col.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(28);
-        col.setPadding(pad, pad, pad, pad);
-        scroll.addView(col);
-
-        final String deviceId = MainActivity.getOrCreateDeviceId(this);
-        final String pairingUrl = MainActivity.buildPairingUrl(this);
-
-        col.addView(title("UniquePeople V2 Settings"));
-        col.addView(label("V2 setup for this Portal. Start with your phone, then refresh here and save."));
-
-        LinearLayout phoneSetup = addExpandableSection(col, "1. Use Your Phone",
-                "Scan the QR code with your phone, choose the album on the web page, then tap Refresh from Web here.",
-                true);
-        phoneSetup.addView(help("Best for family setup. The QR code opens the web companion for only this Portal."));
-        pairingQr = new ImageView(this);
-        pairingQr.setBackgroundColor(Color.WHITE);
-        pairingQr.setPadding(dp(10), dp(10), dp(10), dp(10));
-        pairingQr.setAdjustViewBounds(true);
-        phoneSetup.addView(pairingQr, imageBox(dp(8)));
-        loadPairingQr(pairingUrl);
-
-        phoneSetup.addView(fieldLabel("Portal device ID"));
-        phoneSetup.addView(readOnlyValue(deviceId), wide(dp(4)));
-        phoneSetup.addView(help("This ID is unique to this Portal. Web settings saved for other Portals will not affect this one."));
-        phoneSetup.addView(fieldLabel("Friendly device name"));
-        displayNameField = readOnlyValue(TextUtils.isEmpty(displayName) ? "Not set yet" : displayName);
-        phoneSetup.addView(displayNameField, wide(dp(4)));
-        phoneSetup.addView(help("Set this on the web companion so each family Portal is easy to recognize."));
-        phoneSetup.addView(help(lastRemoteRefreshText(p)));
-
-        phoneSetup.addView(fieldLabel("Phone setup link"));
-        pairingUrlField = readOnlyValue(pairingUrl);
-        phoneSetup.addView(pairingUrlField, wide(dp(4)));
-
-        Button copyPairing = bigButton("Copy phone setup link", "#00796B");
-        copyPairing.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                clipboard.setPrimaryClip(ClipData.newPlainText("UniquePeople setup link", pairingUrl));
-                Toast.makeText(SettingsActivity.this, "Pairing link copied.", Toast.LENGTH_SHORT).show();
-            }
-        });
-        phoneSetup.addView(copyPairing, wide(dp(8)));
-
-        Button refreshRemote = bigButton("Refresh settings from web", "#2F6BFF");
-        refreshRemote.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                refreshRemote.setEnabled(false);
-                MainActivity.refreshRemoteConfigAsync(SettingsActivity.this, new MainActivity.RemoteConfigCallback() {
-                    public void onComplete(boolean success, String message) {
-                        refreshRemote.setEnabled(true);
-                        reloadFieldsFromPrefs();
-                        Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
-        });
-        phoneSetup.addView(refreshRemote, wide(dp(12)));
-
-        LinearLayout albumSetup = addExpandableSection(col, "2. Scan Album QR or Paste Link",
-                "Use the Portal camera to scan a Google Photos album QR code, or paste the shared album link directly.",
-                false);
-        albumSetup.addView(fieldLabel("Shared Google Photos or Drive link"));
-        albumSetup.addView(help("Optional. Paste a public/shared album or folder link. This path works even without the web companion."));
-        albumUrlField = new EditText(this);
-        albumUrlField.setHint("https://photos.app.goo.gl/... or https://drive.google.com/...");
-        albumUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        albumUrlField.setText(albumUrl);
-        albumUrlField.setTextColor(Color.WHITE);
-        albumUrlField.setHintTextColor(Color.parseColor("#7A8090"));
-        albumUrlField.setTextSize(18f);
-        albumUrlField.setMinHeight(dp(64));
-        albumSetup.addView(albumUrlField, wide(dp(4)));
-
-        Button scanQr = bigButton("Scan Album QR Code", "#00796B");
-        scanQr.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivityForResult(new Intent(SettingsActivity.this, QrScanActivity.class), REQ_QR_SCAN);
-            }
-        });
-        albumSetup.addView(scanQr, wide(dp(10)));
-
-        LinearLayout display = addExpandableSection(col, "Display",
-                "Adjust the tile rail that appears over the photos.",
-                false);
-        addClockDisplaySettings(display, clockColor, clockSize,
-                showClock, showWeather, showStocks, showGreeting, showBirthdays,
-                tileRenderer, hostedTilesUrl);
-
-        LinearLayout advanced = addExpandableSection(col, "Advanced",
-                "Website viewer, assistant, and legacy video fallback options.",
-                false);
-
-        Button openPairing = bigButton("Open setup page on this Portal", "#33394A");
-        openPairing.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(pairingUrl)));
-            }
-        });
-        advanced.addView(openPairing, wide(dp(8)));
-
-        advanced.addView(sectionTitle("Display Mode"));
-        advanced.addView(help("Direct shared-link mode is best for most people. Use Photo Host only if you have a separate website that renders the album."));
-        RadioGroup group = new RadioGroup(this);
-        rGooglePhotos = radio("Open shared Google Photos or Drive link directly");
-        rPhotoHost = radio("Load through Photo Host viewer (advanced)");
-        rStream = radio("Stream a video URL");
-        rDownload = radio("Download a video once, then play offline");
-        group.addView(rGooglePhotos);
-        group.addView(rPhotoHost);
-        group.addView(rStream);
-        group.addView(rDownload);
-        if (hasBundled) {
-            rBundled = radio("Use the built-in video");
-            group.addView(rBundled);
-        }
-        advanced.addView(group, wide(dp(8)));
-
-        advanced.addView(sectionTitle("Advanced Website Viewer"));
-        advanced.addView(fieldLabel("Photo Host viewer URL"));
-        advanced.addView(help("Optional. Only used when Photo Host mode is selected. The app opens this URL with albumUrl=<your shared link>."));
-        photoHostUrlField = new EditText(this);
-        photoHostUrlField.setHint(MainActivity.DEFAULT_PHOTO_HOST_URL);
-        photoHostUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        photoHostUrlField.setText(photoHostUrl);
-        photoHostUrlField.setTextColor(Color.WHITE);
-        photoHostUrlField.setHintTextColor(Color.parseColor("#7A8090"));
-        photoHostUrlField.setTextSize(18f);
-        photoHostUrlField.setMinHeight(dp(64));
-        advanced.addView(photoHostUrlField, wide(dp(4)));
-
-        advanced.addView(sectionTitle("Video Fallback"));
-        advanced.addView(fieldLabel("Video URL"));
-        advanced.addView(help("Optional. Used only for Stream or Download video modes. Leave blank for photo modes and default photos."));
-        urlField = new EditText(this);
-        urlField.setHint("https://example.com/family.mp4");
-        urlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        urlField.setText(url);
-        urlField.setTextColor(Color.WHITE);
-        urlField.setHintTextColor(Color.parseColor("#7A8090"));
-        urlField.setTextSize(18f);
-        urlField.setMinHeight(dp(64));
-        advanced.addView(urlField, wide(dp(4)));
-
-        if (mode == MainActivity.MODE_GOOGLE_PHOTOS) rGooglePhotos.setChecked(true);
-        else if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
-        else if (mode == MainActivity.MODE_DOWNLOAD) rDownload.setChecked(true);
-        else if (mode == MainActivity.MODE_BUNDLED && hasBundled) rBundled.setChecked(true);
-        else rStream.setChecked(true);
-
-        advanced.addView(sectionTitle("Portal Assistant"));
-        advanced.addView(fieldLabel("Assistant web app URL"));
-        advanced.addView(help("Optional. This should point to the browser assistant app. API keys stay on that server, not inside this Android APK."));
-
-        assistantUrlField = new EditText(this);
-        assistantUrlField.setHint(MainActivity.DEFAULT_ASSISTANT_URL);
-        assistantUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        assistantUrlField.setText(assistantUrl);
-        assistantUrlField.setTextColor(Color.WHITE);
-        assistantUrlField.setHintTextColor(Color.parseColor("#7A8090"));
-        assistantUrlField.setTextSize(18f);
-        assistantUrlField.setMinHeight(dp(64));
-        advanced.addView(assistantUrlField, wide(dp(4)));
-
-        Button openAssistant = bigButton("Open Assistant", "#00796B");
-        openAssistant.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                if (saveAssistantUrl()) {
-                    startActivity(new android.content.Intent(SettingsActivity.this, AssistantActivity.class));
-                }
-            }
-        });
-        advanced.addView(openAssistant, wide(dp(16)));
-
-        Button save = bigButton("Save & Play", "#2F6BFF");
-        save.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { save(); }
-        });
-        col.addView(save, wide(dp(24)));
-
-        Button cancel = bigButton("Cancel", "#33394A");
-        cancel.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) { finish(); }
-        });
-        col.addView(cancel, wide(dp(12)));
-        col.addView(spacer(dp(64)));
-
-        setContentView(scroll);
+    @Override protected void onCreate(Bundle state) {
+        super.onCreate(state);
+        draft = readSettings();
+        setContentView(shell());
+        showSetup();
     }
 
-    private void reloadFieldsFromPrefs() {
-        SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
-        albumUrlField.setText(MainActivity.getAlbumUrl(p));
-        photoHostUrlField.setText(p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL));
-        assistantUrlField.setText(p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL));
-        if (hostedTilesUrlField != null) {
-            hostedTilesUrlField.setText(p.getString(MainActivity.KEY_HOSTED_TILES_URL, MainActivity.DEFAULT_HOSTED_TILES_URL));
-        }
-        if (displayNameField != null) {
-            String displayName = p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, "");
-            displayNameField.setText(TextUtils.isEmpty(displayName) ? "Not set yet" : displayName);
-        }
-        if (clockSizeField != null) {
-            clockSizeField.setText(String.valueOf(p.getInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP)));
-        }
-        String tileRenderer = p.getString(MainActivity.KEY_TILE_RENDERER, MainActivity.TILE_RENDERER_NATIVE);
-        if (rTileHosted != null && MainActivity.TILE_RENDERER_HOSTED.equals(tileRenderer)) rTileHosted.setChecked(true);
-        else if (rTileNative != null) rTileNative.setChecked(true);
-        String clockColor = p.getString(MainActivity.KEY_CLOCK_COLOR, MainActivity.DEFAULT_CLOCK_COLOR);
-        if (rClockWhite != null && "#FFFFFF".equalsIgnoreCase(clockColor)) rClockWhite.setChecked(true);
-        else if (rClockAmber != null && "#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
-        else if (rClockCyan != null && "#00E5FF".equalsIgnoreCase(clockColor)) rClockCyan.setChecked(true);
-        else if (rClockGreen != null) rClockGreen.setChecked(true);
-        if (tileClock != null) tileClock.setChecked(p.getBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, true));
-        if (tileWeather != null) tileWeather.setChecked(p.getBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, false));
-        if (tileStocks != null) tileStocks.setChecked(p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false));
-        if (tileGreeting != null) tileGreeting.setChecked(p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, false));
-        if (tileBirthdays != null) tileBirthdays.setChecked(p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false));
-        int mode = p.getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
-        if (mode == MainActivity.MODE_PHOTO_HOST) rPhotoHost.setChecked(true);
-        else rGooglePhotos.setChecked(true);
+    private View shell() {
+        FrameLayout root = new FrameLayout(this); root.setBackgroundColor(BG);
+        LinearLayout body = new LinearLayout(this); body.setOrientation(LinearLayout.HORIZONTAL);
+        FrameLayout.LayoutParams bodyLp = new FrameLayout.LayoutParams(-1, -1); bodyLp.bottomMargin = dp(78);
+        root.addView(body, bodyLp);
+        body.addView(sidebar(), new LinearLayout.LayoutParams(dp(300), -1));
+        contentHost = new FrameLayout(this); body.addView(contentHost, new LinearLayout.LayoutParams(0, -1, 1));
+        FrameLayout.LayoutParams footerLp = new FrameLayout.LayoutParams(-1, dp(78)); footerLp.gravity = Gravity.BOTTOM;
+        root.addView(footer(), footerLp);
+        return root;
     }
 
-    private void addClockDisplaySettings(LinearLayout col, String clockColor, int clockSize,
-                                         boolean showClock, boolean showWeather, boolean showStocks,
-                                         boolean showGreeting, boolean showBirthdays,
-                                         String tileRenderer, String hostedTilesUrl) {
-        col.addView(sectionTitle("Tile Rail"));
-        col.addView(help("Shown as compact stacked tiles on the left side of the slideshow. Optional tiles can stay hidden until their data is ready."));
-        col.addView(fieldLabel("Tile renderer"));
-        col.addView(help("Native tiles are the stable local fallback. Hosted web tiles are V3 and can be updated from Vercel without rebuilding the APK."));
-        RadioGroup tileRendererGroup = new RadioGroup(this);
-        rTileNative = radio("Native Portal tiles");
-        rTileHosted = radio("Hosted web tiles (V3)");
-        tileRendererGroup.addView(rTileNative);
-        tileRendererGroup.addView(rTileHosted);
-        col.addView(tileRendererGroup, wide(dp(4)));
-        if (MainActivity.TILE_RENDERER_HOSTED.equals(tileRenderer)) rTileHosted.setChecked(true);
-        else rTileNative.setChecked(true);
-
-        col.addView(fieldLabel("Hosted tiles URL"));
-        hostedTilesUrlField = new EditText(this);
-        hostedTilesUrlField.setHint(MainActivity.DEFAULT_HOSTED_TILES_URL);
-        hostedTilesUrlField.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
-        hostedTilesUrlField.setText(hostedTilesUrl);
-        hostedTilesUrlField.setTextColor(Color.WHITE);
-        hostedTilesUrlField.setHintTextColor(Color.parseColor("#7A8090"));
-        hostedTilesUrlField.setTextSize(18f);
-        hostedTilesUrlField.setMinHeight(dp(64));
-        col.addView(hostedTilesUrlField, wide(dp(12)));
-
-        tileClock = checkbox("Clock", showClock);
-        tileGreeting = checkbox("Daily greeting", showGreeting);
-        tileWeather = checkbox("Weather", showWeather);
-        tileStocks = checkbox("Stocks", showStocks);
-        tileBirthdays = checkbox("Birthday reminders", showBirthdays);
-        col.addView(tileClock);
-        col.addView(tileGreeting);
-        col.addView(tileWeather);
-        col.addView(tileStocks);
-        col.addView(tileBirthdays);
-
-        col.addView(sectionTitle("Clock Display"));
-        col.addView(help("Green is the default because it is easiest to read across the room. The clock tile keeps time, day, date, and year stacked."));
-        col.addView(fieldLabel("Clock color"));
-        RadioGroup clockColorGroup = new RadioGroup(this);
-        rClockGreen = radio("Classic digital green");
-        rClockWhite = radio("White");
-        rClockAmber = radio("Amber");
-        rClockCyan = radio("Cyan");
-        clockColorGroup.addView(rClockGreen);
-        clockColorGroup.addView(rClockWhite);
-        clockColorGroup.addView(rClockAmber);
-        clockColorGroup.addView(rClockCyan);
-        col.addView(clockColorGroup, wide(dp(4)));
-        if ("#FFFFFF".equalsIgnoreCase(clockColor)) rClockWhite.setChecked(true);
-        else if ("#FFB000".equalsIgnoreCase(clockColor)) rClockAmber.setChecked(true);
-        else if ("#00E5FF".equalsIgnoreCase(clockColor)) rClockCyan.setChecked(true);
-        else rClockGreen.setChecked(true);
-
-        col.addView(fieldLabel("Clock font size"));
-        col.addView(help("Use a number from 24 to 72. Larger sizes are easier to see across the room."));
-        clockSizeField = new EditText(this);
-        clockSizeField.setHint(String.valueOf(MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP));
-        clockSizeField.setInputType(InputType.TYPE_CLASS_NUMBER);
-        clockSizeField.setText(String.valueOf(clockSize));
-        clockSizeField.setTextColor(Color.WHITE);
-        clockSizeField.setHintTextColor(Color.parseColor("#7A8090"));
-        clockSizeField.setTextSize(18f);
-        clockSizeField.setMinHeight(dp(64));
-        col.addView(clockSizeField, wide(dp(12)));
+    private View sidebar() {
+        LinearLayout side = column(); side.setPadding(dp(34), dp(34), dp(24), dp(28)); side.setBackgroundColor(SIDE);
+        side.addView(txt("UniquePeople", 25, TEXT, true));
+        TextView sub = txt("V3.1 Portal settings", 14, MUTED, false); side.addView(sub, top(5));
+        setupNav = nav("Setup"); advancedNav = nav("Advanced");
+        side.addView(setupNav, top(54)); side.addView(advancedNav, full());
+        setupNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showSetup(); }});
+        advancedNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAdvanced(); }});
+        side.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
+        LinearLayout device = column(); device.setPadding(dp(16), dp(16), dp(16), dp(16)); device.setBackground(box(CARD, BORDER, 12));
+        sideDevice = txt(deviceName(), 15, TEXT, true); device.addView(sideDevice);
+        sideStatus = txt("●  " + syncStatus(), 12, GREEN, false); device.addView(sideStatus, top(6));
+        side.addView(device, full());
+        return side;
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
-            String albumUrl = data != null ? data.getStringExtra("album_url") : null;
-            if (TextUtils.isEmpty(albumUrl)) {
-                albumUrl = MainActivity.getAlbumUrl(getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE));
-            }
-            albumUrlField.setText(albumUrl);
-            rGooglePhotos.setChecked(true);
-            Toast.makeText(this, "QR link saved. Tap Save & Play to return to the slideshow.", Toast.LENGTH_LONG).show();
-        }
+    private View footer() {
+        LinearLayout footer = row(); footer.setGravity(Gravity.CENTER_VERTICAL); footer.setPadding(dp(30), dp(12), dp(30), dp(12)); footer.setBackgroundColor(SIDE);
+        footer.addView(txt("UniquePeople OS v2.4  •  Connected securely", 13, MUTED, false), new LinearLayout.LayoutParams(0, -2, 1));
+        Button refresh = button("Refresh from web", false), cancel = button("Cancel", false), save = button("Save & play", true);
+        refresh.setOnClickListener(new View.OnClickListener() { public void onClick(final View v) { refresh(v); }});
+        cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }});
+        save.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { save(); }});
+        footer.addView(refresh, buttonParams()); footer.addView(cancel, buttonParams()); footer.addView(save, buttonParams());
+        return footer;
     }
+
+    private void showSetup() {
+        captureAdvanced(); advanced = false; styleNav(); contentHost.removeAllViews();
+        LinearLayout content = page();
+        content.addView(hero()); content.addView(identityBar(), top(18));
+        content.addView(txt("Scan Album", 20, TEXT, true), section()); content.addView(scanCard());
+        content.addView(txt("Content Tiles", 20, TEXT, true), section()); content.addView(tilesCard());
+        mount(content);
+    }
+
+    private View hero() {
+        LinearLayout card = row(); card.setGravity(Gravity.CENTER_VERTICAL); card.setPadding(dp(34), dp(30), dp(34), dp(30)); card.setBackground(box(CARD, BORDER, 16));
+        LinearLayout copy = column(); copy.addView(eyebrow("THIS SMART DISPLAY")); copy.addView(txt(deviceName(), 31, TEXT, true), top(8));
+        TextView desc = txt("Scan this code to easily manage photos, linked accounts, and custom integrations from your phone or browser.", 16, MUTED, false);
+        desc.setLineSpacing(0, 1.12f); copy.addView(desc, top(12)); copy.addView(txt("portal.uniquepeople.com/setup", 15, TEAL, true), top(18));
+        card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        ImageView qr = new ImageView(this); qr.setPadding(dp(10), dp(10), dp(10), dp(10)); qr.setBackgroundColor(Color.WHITE); qr.setImageBitmap(makeQr(MainActivity.buildPairingUrl(this), 420));
+        card.addView(qr, new LinearLayout.LayoutParams(dp(220), dp(220)));
+        return card;
+    }
+
+    private View identityBar() {
+        LinearLayout bar = row(); bar.setGravity(Gravity.CENTER_VERTICAL); bar.setPadding(dp(24), dp(20), dp(24), dp(20)); bar.setBackground(box(CARD, BORDER, 12));
+        bar.addView(identity("DEVICE ID", draft.deviceId, TEXT), new LinearLayout.LayoutParams(0, -2, 1));
+        bar.addView(divider(), new LinearLayout.LayoutParams(dp(1), dp(46)));
+        bar.addView(identity("CURRENT ALBUM", empty(draft.currentAlbumName) ? "No album selected" : draft.currentAlbumName, TEXT), new LinearLayout.LayoutParams(0, -2, 1.35f));
+        bar.addView(divider(), new LinearLayout.LayoutParams(dp(1), dp(46)));
+        bar.addView(identity("STATUS", "●  Connected", GREEN), new LinearLayout.LayoutParams(0, -2, .7f));
+        return bar;
+    }
+
+    private View scanCard() {
+        LinearLayout card = row(); card.setGravity(Gravity.CENTER_VERTICAL); card.setPadding(dp(25), dp(22), dp(25), dp(22)); card.setBackground(box(CARD, BORDER, 12));
+        LinearLayout copy = column(); copy.addView(txt("Use camera to scan album QR code", 18, TEXT, true));
+        copy.addView(txt("Point this portal at a Google Photos shared album QR code to connect directly.", 14, MUTED, false), top(7));
+        card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
+        Button open = button("Open Camera", true); open.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { startActivityForResult(new Intent(SettingsActivity.this, QrScanActivity.class), REQ_QR_SCAN); }});
+        card.addView(open, new LinearLayout.LayoutParams(dp(180), dp(54)));
+        return card;
+    }
+
+    private View tilesCard() {
+        LinearLayout card = column(); card.setPadding(dp(25), dp(22), dp(25), dp(22)); card.setBackground(box(CARD, BORDER, 12));
+        LinearLayout modeRow = row(); modeRow.setGravity(Gravity.CENTER_VERTICAL); modeRow.addView(txt("Rendering engine", 16, TEXT, true), new LinearLayout.LayoutParams(0, -2, 1));
+        RadioGroup group = new RadioGroup(this); group.setOrientation(RadioGroup.HORIZONTAL); nativeMode = radio("Native"); webMode = radio("Web driven"); group.addView(nativeMode); group.addView(webMode);
+        if (draft.tileMode == PortalSettings.TileMode.WEB_DRIVEN) webMode.setChecked(true); else nativeMode.setChecked(true); modeRow.addView(group); card.addView(modeRow);
+        enabledTiles.clear(); enabledTiles.addAll(draft.enabledTiles); chips.clear();
+        LinearLayout chipRow = row(); addChip(chipRow, "clock", "Clock"); addChip(chipRow, "daily_greeting", "Daily greeting"); addChip(chipRow, "weather", "Weather"); addChip(chipRow, "markets", "Markets"); addChip(chipRow, "birthdays", "Birthdays");
+        HorizontalScrollView scroll = new HorizontalScrollView(this); scroll.setHorizontalScrollBarEnabled(false); scroll.addView(chipRow); card.addView(scroll, top(18));
+        card.addView(txt("Shown when no album or web content is available", 13, MUTED, false), top(14));
+        return card;
+    }
+
+    private void showAdvanced() {
+        captureSetup(); advanced = true; styleNav(); contentHost.removeAllViews();
+        LinearLayout content = page(); content.addView(txt("Advanced Settings", 31, TEXT, true));
+        content.addView(txt("Manual URLs, fallback options, and assistant configuration.", 16, MUTED, false), top(8));
+        LinearLayout cards = row(); cards.setGravity(Gravity.TOP);
+        LinearLayout left = advancedCard("PHOTOS & VIDEO SLIDESHOW", "Photo Host & Fallbacks");
+        photoHostField = input("Photo Host URL", "https://photos.example.com/slideshow", draft.photoHostUrl);
+        videoField = input("Video Fallback URL", "https://example.com/fallback.mp4", draft.videoFallbackUrl);
+        left.addView(fieldLabel("Photo Host URL"), top(22)); left.addView(photoHostField, inputParams());
+        left.addView(fieldLabel("Video Fallback URL"), top(18)); left.addView(videoField, inputParams());
+        left.addView(txt("Used when the primary content source is unavailable", 13, MUTED, false), top(14));
+        LinearLayout right = advancedCard("PORTAL ASSISTANT", "Assistant Integration");
+        assistantField = input("Assistant URL", "https://example.com/assistant", draft.assistantUrl);
+        right.addView(fieldLabel("Assistant URL"), top(22)); right.addView(assistantField, inputParams());
+        right.addView(txt("●  " + (draft.assistantConnected ? "Assistant connected" : "Assistant not connected"), 14, draft.assistantConnected ? GREEN : MUTED, false), top(18));
+        Button open = button("Open Assistant", true); open.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openAssistant(); }}); LinearLayout.LayoutParams openLp = full(); openLp.height = dp(56); openLp.topMargin = dp(24); right.addView(open, openLp);
+        LinearLayout.LayoutParams leftLp = new LinearLayout.LayoutParams(0, -2, 1); leftLp.rightMargin = dp(10); LinearLayout.LayoutParams rightLp = new LinearLayout.LayoutParams(0, -2, 1); rightLp.leftMargin = dp(10);
+        cards.addView(left, leftLp); cards.addView(right, rightLp); content.addView(cards, top(34)); mount(content);
+    }
+
+    private void mount(LinearLayout content) {
+        FrameLayout page = new FrameLayout(this); page.setBackgroundColor(BG);
+        ScrollView scroll = new ScrollView(this); scroll.addView(content); page.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        TextView close = txt("×  Close Settings", 14, MUTED, true); close.setGravity(Gravity.CENTER); close.setBackground(box(BG, BORDER, 8)); close.setClickable(true); close.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }});
+        FrameLayout.LayoutParams closeLp = new FrameLayout.LayoutParams(dp(170), dp(48)); closeLp.gravity = Gravity.TOP | Gravity.RIGHT; closeLp.topMargin = dp(28); closeLp.rightMargin = dp(36); page.addView(close, closeLp);
+        contentHost.addView(page, new FrameLayout.LayoutParams(-1, -1));
+    }
+
+    private LinearLayout page() { LinearLayout content = column(); content.setPadding(dp(54), dp(92), dp(54), dp(44)); return content; }
+    private LinearLayout advancedCard(String category, String title) { LinearLayout card = column(); card.setPadding(dp(28), dp(28), dp(28), dp(28)); card.setBackground(box(CARD, BORDER, 14)); card.addView(eyebrow(category)); card.addView(txt(title, 23, TEXT, true), top(8)); return card; }
+
+    private PortalSettings readSettings() {
+        SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE); Set<String> tiles = new HashSet<String>();
+        boolean legacyProfile = !p.contains(MainActivity.KEY_TILE_RENDERER)
+                && (p.contains(MainActivity.KEY_ALBUM_URL) || p.contains(MainActivity.KEY_MODE)
+                || p.contains(MainActivity.KEY_CLOCK_COLOR));
+        if (p.getBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, true)) tiles.add("clock");
+        if (p.getBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, !legacyProfile)) tiles.add("daily_greeting");
+        if (p.getBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, !legacyProfile)) tiles.add("weather");
+        if (p.getBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, false)) tiles.add("markets");
+        if (p.getBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, false)) tiles.add("birthdays");
+        String assistant = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL);
+        String renderer = p.getString(MainActivity.KEY_TILE_RENDERER,
+                legacyProfile ? MainActivity.TILE_RENDERER_NATIVE : MainActivity.TILE_RENDERER_HOSTED);
+        return new PortalSettings(MainActivity.getOrCreateDeviceId(this), p.getString(MainActivity.KEY_DEVICE_FRIENDLY_NAME, ""), MainActivity.getAlbumUrl(p), p.getString(MainActivity.KEY_CURRENT_ALBUM_NAME, ""), MainActivity.TILE_RENDERER_HOSTED.equals(renderer) ? PortalSettings.TileMode.WEB_DRIVEN : PortalSettings.TileMode.NATIVE, tiles, p.getString(MainActivity.KEY_PHOTO_HOST_URL, MainActivity.DEFAULT_PHOTO_HOST_URL), p.getString(MainActivity.KEY_URL, ""), assistant, validUrl(assistant));
+    }
+
+    private PortalSettings copy(String album, PortalSettings.TileMode mode, Set<String> tiles, String host, String video, String assistant) {
+        return new PortalSettings(draft.deviceId, draft.deviceName, album, draft.currentAlbumName, mode, tiles, host, video, assistant, validUrl(assistant));
+    }
+
+    private void captureSetup() { if (advanced || nativeMode == null) return; draft = copy(draft.sharedAlbumUrl, webMode.isChecked() ? PortalSettings.TileMode.WEB_DRIVEN : PortalSettings.TileMode.NATIVE, enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); }
+    private void captureAdvanced() { if (!advanced || photoHostField == null) return; draft = copy(draft.sharedAlbumUrl, draft.tileMode, draft.enabledTiles, value(photoHostField), value(videoField), value(assistantField)); }
 
     private void save() {
-        int mode;
-        if (rBundled != null && rBundled.isChecked()) {
-            mode = MainActivity.MODE_BUNDLED;
-        } else if (rDownload.isChecked()) {
-            mode = MainActivity.MODE_DOWNLOAD;
-        } else if (rGooglePhotos.isChecked()) {
-            mode = MainActivity.MODE_GOOGLE_PHOTOS;
-        } else if (rPhotoHost.isChecked()) {
-            mode = MainActivity.MODE_PHOTO_HOST;
-        } else {
-            mode = MainActivity.MODE_STREAM;
-        }
-        String url = urlField.getText().toString().trim();
-        String albumUrl = albumUrlField.getText().toString().trim();
-        String photoHostUrl = normalizePhotoHostUrl();
-        if (mode == MainActivity.MODE_PHOTO_HOST && TextUtils.isEmpty(albumUrl)) {
-            Toast.makeText(this, "Enter a shared Google Photos or Drive link.", Toast.LENGTH_LONG).show();
-            return;
-        }
-        if ((mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST)
-                && !TextUtils.isEmpty(albumUrl)
-                && !isValidWebUrl(albumUrl)) {
-            Toast.makeText(this, "Album link must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (mode == MainActivity.MODE_PHOTO_HOST && !isValidWebUrl(photoHostUrl)) {
-            Toast.makeText(this, "Photo Host URL must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (mode != MainActivity.MODE_BUNDLED && TextUtils.isEmpty(url)) {
-            if (mode == MainActivity.MODE_GOOGLE_PHOTOS || mode == MainActivity.MODE_PHOTO_HOST) {
-                url = "";
-            } else {
-                Toast.makeText(this, "Enter a video URL, or pick the built-in video.", Toast.LENGTH_LONG).show();
-                return;
-            }
-        }
-        if (mode != MainActivity.MODE_BUNDLED
-                && mode != MainActivity.MODE_GOOGLE_PHOTOS
-                && mode != MainActivity.MODE_PHOTO_HOST
-                && !isValidWebUrl(url)) {
-            Toast.makeText(this, "URL must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return;
-        }
-        String assistantUrl = normalizeAssistantUrl();
-        if (!isValidAssistantUrl(assistantUrl)) {
-            Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return;
-        }
-        String hostedTilesUrl = normalizeHostedTilesUrl();
-        if (!isValidWebUrl(hostedTilesUrl)) {
-            Toast.makeText(this, "Hosted tiles URL must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return;
-        }
-        int clockSize = normalizeClockSize();
-        if (clockSize < 0) return;
-        String clockColor = selectedClockColor();
-        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
-                .putString(MainActivity.KEY_URL, url)
-                .putString(MainActivity.KEY_ALBUM_URL, albumUrl)
-                .putString(MainActivity.KEY_PHOTO_HOST_URL, photoHostUrl)
-                .putInt(MainActivity.KEY_MODE, mode)
-                .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
-                .putString(MainActivity.KEY_HOSTED_TILES_URL, hostedTilesUrl)
-                .putString(MainActivity.KEY_TILE_RENDERER, selectedTileRenderer())
-                .putString(MainActivity.KEY_CLOCK_COLOR, clockColor)
-                .putInt(MainActivity.KEY_CLOCK_TEXT_SIZE_SP, clockSize)
-                .putBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, tileClock == null || tileClock.isChecked())
-                .putBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, tileWeather != null && tileWeather.isChecked())
-                .putBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, tileStocks != null && tileStocks.isChecked())
-                .putBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, tileGreeting != null && tileGreeting.isChecked())
-                .putBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, tileBirthdays != null && tileBirthdays.isChecked())
-                .apply();
-        setResult(RESULT_OK);
-        finish();
+        if (advanced) captureAdvanced(); else captureSetup();
+        if (!optionalUrl(draft.photoHostUrl, "Photo Host URL") || !optionalUrl(draft.videoFallbackUrl, "Video Fallback URL") || !optionalUrl(draft.assistantUrl, "Assistant URL")) return;
+        SharedPreferences.Editor editor = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
+                .putString(MainActivity.KEY_ALBUM_URL, safe(draft.sharedAlbumUrl))
+                .putString(MainActivity.KEY_PHOTO_HOST_URL, orDefault(draft.photoHostUrl, MainActivity.DEFAULT_PHOTO_HOST_URL))
+                .putString(MainActivity.KEY_URL, safe(draft.videoFallbackUrl))
+                .putString(MainActivity.KEY_ASSISTANT_URL, orDefault(draft.assistantUrl, MainActivity.DEFAULT_ASSISTANT_URL))
+                .putString(MainActivity.KEY_TILE_RENDERER, draft.tileMode == PortalSettings.TileMode.WEB_DRIVEN ? MainActivity.TILE_RENDERER_HOSTED : MainActivity.TILE_RENDERER_NATIVE)
+                .putBoolean(MainActivity.KEY_TILE_CLOCK_ENABLED, draft.enabledTiles.contains("clock"))
+                .putBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, draft.enabledTiles.contains("daily_greeting"))
+                .putBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, draft.enabledTiles.contains("weather"))
+                .putBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, draft.enabledTiles.contains("markets"))
+                .putBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, draft.enabledTiles.contains("birthdays"));
+        if (albumScanned) editor.putInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
+        editor.apply();
+        setResult(RESULT_OK); finish();
     }
 
-    private String selectedClockColor() {
-        if (rClockWhite != null && rClockWhite.isChecked()) return "#FFFFFF";
-        if (rClockAmber != null && rClockAmber.isChecked()) return "#FFB000";
-        if (rClockCyan != null && rClockCyan.isChecked()) return "#00E5FF";
-        return MainActivity.DEFAULT_CLOCK_COLOR;
+    private void refresh(final View button) {
+        button.setEnabled(false); MainActivity.refreshRemoteConfigAsync(this, new MainActivity.RemoteConfigCallback() { public void onComplete(boolean ok, String message) {
+            button.setEnabled(true); if (ok) { draft = readSettings(); sideDevice.setText(deviceName()); sideStatus.setText("●  Synced just now"); if (advanced) showAdvanced(); else showSetup(); } Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+        }});
     }
 
-    private String selectedTileRenderer() {
-        if (rTileHosted != null && rTileHosted.isChecked()) return MainActivity.TILE_RENDERER_HOSTED;
-        return MainActivity.TILE_RENDERER_NATIVE;
-    }
+    private void openAssistant() { captureAdvanced(); if (!optionalUrl(draft.assistantUrl, "Assistant URL")) return; Intent i = new Intent(this, AssistantActivity.class); i.putExtra("assistant_url", orDefault(draft.assistantUrl, MainActivity.DEFAULT_ASSISTANT_URL)); startActivity(i); }
 
-    private String normalizeHostedTilesUrl() {
-        if (hostedTilesUrlField == null) return MainActivity.DEFAULT_HOSTED_TILES_URL;
-        String value = hostedTilesUrlField.getText().toString().trim();
-        return TextUtils.isEmpty(value) ? MainActivity.DEFAULT_HOSTED_TILES_URL : value;
-    }
-
-    private int normalizeClockSize() {
-        if (clockSizeField == null) return MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP;
-        String value = clockSizeField.getText().toString().trim();
-        if (TextUtils.isEmpty(value)) return MainActivity.DEFAULT_CLOCK_TEXT_SIZE_SP;
-        try {
-            int size = Integer.parseInt(value);
-            if (size < MainActivity.MIN_CLOCK_TEXT_SIZE_SP || size > MainActivity.MAX_CLOCK_TEXT_SIZE_SP) {
-                Toast.makeText(this, "Clock font size must be between 24 and 72.", Toast.LENGTH_LONG).show();
-                return -1;
-            }
-            return size;
-        } catch (NumberFormatException e) {
-            Toast.makeText(this, "Clock font size must be a number.", Toast.LENGTH_LONG).show();
-            return -1;
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data); if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
+            String album = data == null ? null : data.getStringExtra("album_url"); if (empty(album)) album = MainActivity.getAlbumUrl(getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE));
+            draft = copy(album, draft.tileMode, draft.enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); albumScanned = true; Toast.makeText(this, "Album ready. Save & play to connect it.", Toast.LENGTH_LONG).show(); showSetup();
         }
     }
 
-    private boolean saveAssistantUrl() {
-        String assistantUrl = normalizeAssistantUrl();
-        if (!isValidAssistantUrl(assistantUrl)) {
-            Toast.makeText(this, "Assistant URL must start with http:// or https://", Toast.LENGTH_LONG).show();
-            return false;
-        }
-        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
-                .putString(MainActivity.KEY_ASSISTANT_URL, assistantUrl)
-                .apply();
-        return true;
-    }
+    private void addChip(LinearLayout row, final String key, String label) { final TextView chip = txt(label, 14, TEXT, true); chip.setGravity(Gravity.CENTER); chip.setPadding(dp(18), 0, dp(18), 0); chip.setClickable(true); chips.put(key, chip); styleChip(chip, enabledTiles.contains(key)); chip.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { if (enabledTiles.contains(key)) enabledTiles.remove(key); else enabledTiles.add(key); styleChip(chip, enabledTiles.contains(key)); }}); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(48)); lp.rightMargin = dp(10); row.addView(chip, lp); }
+    private void styleChip(TextView chip, boolean enabled) { chip.setTextColor(enabled ? TEXT : MUTED); chip.setBackground(box(enabled ? Color.rgb(20, 76, 75) : BG, enabled ? TEAL : BORDER, 24)); }
+    private void styleNav() { setupNav.setTextColor(advanced ? MUTED : TEXT); advancedNav.setTextColor(advanced ? TEXT : MUTED); setupNav.setBackground(box(advanced ? SIDE : Color.rgb(18, 55, 57), advanced ? SIDE : TEAL, 8)); advancedNav.setBackground(box(advanced ? Color.rgb(18, 55, 57) : SIDE, advanced ? TEAL : SIDE, 8)); }
 
-    private String normalizeAssistantUrl() {
-        if (assistantUrlField == null) return MainActivity.DEFAULT_ASSISTANT_URL;
-        String assistantUrl = assistantUrlField.getText().toString().trim();
-        if (TextUtils.isEmpty(assistantUrl)) return MainActivity.DEFAULT_ASSISTANT_URL;
-        return assistantUrl;
-    }
-
-    private String normalizePhotoHostUrl() {
-        if (photoHostUrlField == null) return MainActivity.DEFAULT_PHOTO_HOST_URL;
-        String photoHostUrl = photoHostUrlField.getText().toString().trim();
-        if (TextUtils.isEmpty(photoHostUrl)) return MainActivity.DEFAULT_PHOTO_HOST_URL;
-        return photoHostUrl;
-    }
-
-    private boolean isValidAssistantUrl(String url) {
-        return isValidWebUrl(url);
-    }
-
-    private boolean isValidWebUrl(String url) {
-        return url.startsWith("http://") || url.startsWith("https://");
-    }
-
-    private boolean hasBundledVideo() {
-        try {
-            for (String n : getAssets().list("")) if ("slideshow.mp4".equals(n)) return true;
-        } catch (Exception ignored) { }
-        return false;
-    }
-
-    private String lastRemoteRefreshText(SharedPreferences p) {
-        long last = p.getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0);
-        if (last <= 0) return "Remote settings have not synced yet. Local defaults are ready.";
-        return "Last web settings sync: " + DateFormat.getDateTimeInstance().format(new Date(last));
-    }
-
-    private void loadPairingQr(final String pairingUrl) {
-        new Thread(new Runnable() {
-            public void run() {
-                try {
-                    String qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data="
-                            + URLEncoder.encode(pairingUrl, "UTF-8");
-                    HttpURLConnection c = (HttpURLConnection) new URL(qrUrl).openConnection();
-                    c.setConnectTimeout(10000);
-                    c.setReadTimeout(10000);
-                    c.connect();
-                    InputStream in = c.getInputStream();
-                    final Bitmap bitmap = BitmapFactory.decodeStream(in);
-                    in.close();
-                    if (bitmap != null) {
-                        ui.post(new Runnable() {
-                            public void run() {
-                                pairingQr.setImageBitmap(bitmap);
-                            }
-                        });
-                    }
-                } catch (Exception ignored) { }
-            }
-        }).start();
-    }
-
-    // ---- tiny view helpers ----
-    private LinearLayout addExpandableSection(LinearLayout parent, final String title, String summary, boolean expanded) {
-        final LinearLayout content = new LinearLayout(this);
-        content.setOrientation(LinearLayout.VERTICAL);
-        content.setVisibility(expanded ? View.VISIBLE : View.GONE);
-
-        final Button header = new Button(this);
-        header.setAllCaps(false);
-        header.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        header.setTextSize(20f);
-        header.setTextColor(Color.WHITE);
-        header.setBackgroundColor(Color.parseColor("#202638"));
-        header.setPadding(dp(14), 0, dp(14), 0);
-        header.setMinHeight(dp(64));
-        header.setText((expanded ? "v  " : ">  ") + title);
-        header.setOnClickListener(new View.OnClickListener() {
-            public void onClick(View v) {
-                boolean show = content.getVisibility() != View.VISIBLE;
-                content.setVisibility(show ? View.VISIBLE : View.GONE);
-                header.setText((show ? "v  " : ">  ") + title);
-            }
-        });
-        parent.addView(header, wide(dp(18)));
-
-        if (!TextUtils.isEmpty(summary)) {
-            TextView summaryView = help(summary);
-            summaryView.setPadding(dp(10), dp(8), dp(10), dp(2));
-            parent.addView(summaryView);
-        }
-
-        content.setPadding(dp(10), dp(8), dp(10), dp(8));
-        parent.addView(content);
-        return content;
-    }
-
-    private TextView title(String t) {
-        TextView v = new TextView(this);
-        v.setText(t);
-        v.setTextColor(Color.WHITE);
-        v.setTextSize(26f);
-        v.setPadding(0, 0, 0, dp(12));
-        return v;
-    }
-
-    private TextView label(String t) {
-        TextView v = new TextView(this);
-        v.setText(t);
-        v.setTextColor(Color.parseColor("#B5BCCB"));
-        v.setTextSize(16f);
-        v.setPadding(0, 0, 0, dp(8));
-        return v;
-    }
-
-    private TextView fieldLabel(String t) {
-        TextView v = new TextView(this);
-        v.setText(t);
-        v.setTextColor(Color.WHITE);
-        v.setTextSize(18f);
-        v.setPadding(0, dp(4), 0, dp(4));
-        return v;
-    }
-
-    private TextView help(String t) {
-        TextView v = new TextView(this);
-        v.setText(t);
-        v.setTextColor(Color.parseColor("#A7AFBF"));
-        v.setTextSize(14f);
-        v.setPadding(0, 0, 0, dp(6));
-        return v;
-    }
-
-    private EditText readOnlyValue(String t) {
-        EditText v = new EditText(this);
-        v.setText(t);
-        v.setTextColor(Color.WHITE);
-        v.setTextSize(16f);
-        v.setSingleLine(false);
-        v.setMinHeight(dp(58));
-        v.setPadding(dp(12), 0, dp(12), 0);
-        v.setFocusable(false);
-        v.setInputType(InputType.TYPE_NULL);
-        v.setBackgroundColor(Color.parseColor("#202638"));
-        return v;
-    }
-
-    private TextView sectionTitle(String t) {
-        TextView v = title(t);
-        v.setTextSize(21f);
-        v.setPadding(0, dp(18), 0, dp(6));
-        return v;
-    }
-
-    private RadioButton radio(String t) {
-        RadioButton r = new RadioButton(this);
-        r.setText(t);
-        r.setTextColor(Color.WHITE);
-        r.setTextSize(18f);
-        r.setMinHeight(dp(56));
-        r.setPadding(dp(8), 0, 0, 0);
-        return r;
-    }
-
-    private CheckBox checkbox(String t, boolean checked) {
-        CheckBox c = new CheckBox(this);
-        c.setText(t);
-        c.setTextColor(Color.WHITE);
-        c.setTextSize(18f);
-        c.setMinHeight(dp(56));
-        c.setPadding(dp(8), 0, 0, 0);
-        c.setChecked(checked);
-        return c;
-    }
-
-    private Button bigButton(String t, String color) {
-        Button b = new Button(this);
-        b.setText(t);
-        b.setTextSize(20f);
-        b.setAllCaps(false);
-        b.setTextColor(Color.WHITE);
-        b.setBackgroundColor(Color.parseColor(color));
-        b.setMinHeight(dp(60));
-        return b;
-    }
-
-    private View spacer(int height) {
-        View v = new View(this);
-        v.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, height));
-        return v;
-    }
-
-    private LinearLayout.LayoutParams wide(int topMargin) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.topMargin = topMargin;
-        return lp;
-    }
-
-    private LinearLayout.LayoutParams imageBox(int topMargin) {
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(260), dp(260));
-        lp.topMargin = topMargin;
-        lp.gravity = Gravity.LEFT;
-        return lp;
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
-    }
+    private Bitmap makeQr(String value, int size) { try { BitMatrix bits = new QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, size, size); Bitmap image = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565); for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) image.setPixel(x, y, bits.get(x, y) ? Color.BLACK : Color.WHITE); return image; } catch (Exception e) { return null; } }
+    private LinearLayout identity(String label, String value, int color) { LinearLayout item = column(); item.setPadding(dp(18), 0, dp(18), 0); item.addView(eyebrow(label)); item.addView(txt(value, 15, color, true), top(6)); return item; }
+    private TextView eyebrow(String value) { TextView v = txt(value, 12, TEAL, true); v.setLetterSpacing(.12f); return v; }
+    private TextView nav(String value) { TextView v = txt(value, 17, MUTED, true); v.setGravity(Gravity.CENTER_VERTICAL); v.setPadding(dp(18), 0, dp(18), 0); v.setMinHeight(dp(58)); v.setClickable(true); return v; }
+    private Button button(String value, boolean primary) { Button b = new Button(this); b.setText(value); b.setAllCaps(false); b.setTextSize(14); b.setTypeface(Typeface.DEFAULT, Typeface.BOLD); b.setTextColor(primary ? Color.rgb(5, 26, 27) : TEXT); b.setBackground(box(primary ? TEAL : SIDE, primary ? TEAL : BORDER, 8)); return b; }
+    private RadioButton radio(String value) { RadioButton r = new RadioButton(this); r.setText(value); r.setTextColor(TEXT); r.setButtonTintList(new ColorStateList(new int[][]{new int[]{android.R.attr.state_checked}, new int[]{}}, new int[]{TEAL, MUTED})); return r; }
+    private EditText input(String label, String hint, String value) { EditText e = new EditText(this); e.setText(value); e.setHint(hint); e.setContentDescription(label); e.setTextColor(TEXT); e.setHintTextColor(Color.rgb(105, 117, 138)); e.setTextSize(15); e.setSingleLine(); e.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI); e.setPadding(dp(16), 0, dp(16), 0); e.setBackground(box(BG, BORDER, 8)); return e; }
+    private TextView fieldLabel(String value) { return txt(value, 14, TEXT, true); }
+    private TextView txt(String value, float size, int color, boolean bold) { TextView v = new TextView(this); v.setText(value); v.setTextSize(size); v.setTextColor(color); if (bold) v.setTypeface(Typeface.DEFAULT, Typeface.BOLD); return v; }
+    private LinearLayout row() { LinearLayout v = new LinearLayout(this); v.setOrientation(LinearLayout.HORIZONTAL); return v; }
+    private LinearLayout column() { LinearLayout v = new LinearLayout(this); v.setOrientation(LinearLayout.VERTICAL); return v; }
+    private View divider() { View v = new View(this); v.setBackgroundColor(BORDER); return v; }
+    private GradientDrawable box(int fill, int stroke, int radius) { GradientDrawable d = new GradientDrawable(); d.setColor(fill); d.setCornerRadius(dp(radius)); d.setStroke(dp(1), stroke); return d; }
+    private LinearLayout.LayoutParams full() { return new LinearLayout.LayoutParams(-1, -2); }
+    private LinearLayout.LayoutParams top(int margin) { LinearLayout.LayoutParams lp = full(); lp.topMargin = dp(margin); return lp; }
+    private LinearLayout.LayoutParams section() { LinearLayout.LayoutParams lp = top(28); lp.bottomMargin = dp(12); return lp; }
+    private LinearLayout.LayoutParams inputParams() { LinearLayout.LayoutParams lp = full(); lp.height = dp(62); lp.topMargin = dp(8); return lp; }
+    private LinearLayout.LayoutParams buttonParams() { LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(178), dp(52)); lp.leftMargin = dp(12); return lp; }
+    private boolean optionalUrl(String value, String label) { if (empty(value) || validUrl(value)) return true; Toast.makeText(this, label + " must start with http:// or https://", Toast.LENGTH_LONG).show(); return false; }
+    private boolean validUrl(String value) { return !empty(value) && (value.startsWith("http://") || value.startsWith("https://")); }
+    private String value(EditText field) { return field.getText().toString().trim(); }
+    private String safe(String value) { return value == null ? "" : value; }
+    private String orDefault(String value, String fallback) { return empty(value) ? fallback : value; }
+    private boolean empty(String value) { return TextUtils.isEmpty(value); }
+    private String deviceName() { return empty(draft.deviceName) ? "Family-Room-Portal" : draft.deviceName; }
+    private String syncStatus() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0) > 0 ? "Synced just now" : "Connected"; }
+    private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }

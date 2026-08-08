@@ -3,7 +3,6 @@ package com.portal.slideshow;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.ImageFormat;
@@ -305,15 +304,10 @@ public class QrScanActivity extends Activity implements SurfaceHolder.Callback, 
                     return;
                 }
                 finished = true;
-                SharedPreferences.Editor editor = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit();
-                editor.putString(MainActivity.KEY_ALBUM_URL, albumUrl);
-                editor.putInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
-                editor.apply();
-
                 Intent result = new Intent();
                 result.putExtra("album_url", albumUrl);
                 setResult(RESULT_OK, result);
-                Toast.makeText(QrScanActivity.this, "Album QR code saved.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(QrScanActivity.this, "Album QR code scanned.", Toast.LENGTH_SHORT).show();
                 finish();
             }
         });

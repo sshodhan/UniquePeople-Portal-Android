@@ -39,6 +39,16 @@ V3 starts Option B: the release-signed distribution line for family APK sharing 
 - Important migration rule: debug-signed V1/V2 installs cannot update directly to release-signed V3. If Android blocks install because signatures differ, stop and decide whether to do a planned uninstall/reinstall. Do not clear data or uninstall without explicit approval.
 - V3 rollback rule: preserve the exact pre-migration APK before attempting release-signed V3. If rollback is needed after a release-signed install, reinstall a release-signed rollback from the same release keystore, or stop before any destructive action.
 
+## V3.1 Release Note
+
+V3.1 is an in-place update on the V3 release-signed distribution line. It preserves the package name, preference keys, device identity, remote configuration contract, and fallback behavior.
+
+- V3.1 Android versionCode: `4`
+- V3.1 Android versionName: `3.1`
+- V3.1 signing rule: build and distribute with the same stable V3 release certificate; do not rotate the keystore.
+- V3.1 install rule: preserve the currently installed APK first, verify certificate continuity, then install with `adb install -r app-release.apk` so app data remains intact.
+- V3.1 rollback rule: reinstall the preserved release-signed APK. If Android blocks the version downgrade, stop and explain the non-destructive options before uninstalling or clearing data.
+
 ## Must Not Break
 
 1. Preserve package name `com.portal.slideshow`.

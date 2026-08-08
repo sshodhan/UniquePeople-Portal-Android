@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
     static final String KEY_ASSISTANT_URL = "assistant_url";
     static final String KEY_DEVICE_ID = "device_id";
     static final String KEY_DEVICE_FRIENDLY_NAME = "device_friendly_name";
+    static final String KEY_CURRENT_ALBUM_NAME = "current_album_name";
     static final String KEY_LAST_REMOTE_REFRESH_MS = "last_remote_refresh_ms";
     static final String KEY_CLOCK_COLOR = "clock_color";
     static final String KEY_CLOCK_TEXT_SIZE_SP = "clock_text_size_sp";
@@ -961,9 +962,11 @@ public class MainActivity extends Activity {
         String hostedTilesUrl = config.optString("hostedTilesUrl", "");
         String mode = config.optString("mode", config.optString("defaultMode", ""));
         String displayName = config.optString("displayName", "").trim();
+        String currentAlbumName = config.optString("currentAlbumName", config.optString("albumName", "")).trim();
         JSONObject dashboard = config.optJSONObject("dashboard");
 
         if (!TextUtils.isEmpty(displayName)) editor.putString(KEY_DEVICE_FRIENDLY_NAME, displayName);
+        if (!TextUtils.isEmpty(currentAlbumName)) editor.putString(KEY_CURRENT_ALBUM_NAME, currentAlbumName);
         if (isValidWebUrl(albumUrl)) editor.putString(KEY_ALBUM_URL, albumUrl);
         if (isValidWebUrl(photoHostUrl)) editor.putString(KEY_PHOTO_HOST_URL, photoHostUrl);
         if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);

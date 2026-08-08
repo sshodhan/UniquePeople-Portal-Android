@@ -59,6 +59,15 @@ elif grep -Fq 'android:versionCode="3"' "$MANIFEST"; then
     "v3 release signing requires documented signing expectations"
   require_text "$STABILITY_DOC" 'debug-signed V1/V2 installs cannot update directly to release-signed V3' \
     "v3 must document the one-time signing migration"
+elif grep -Fq 'android:versionCode="4"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="3.1"' \
+    "v3.1 versionName must be 3.1"
+  require_text "$STABILITY_DOC" '## V3.1 Release Note' \
+    "v3.1 version bump requires an explicit release note"
+  require_text "$STABILITY_DOC" 'V3.1 rollback rule' \
+    "v3.1 requires documented rollback expectations"
+  require_text "$STABILITY_DOC" 'same stable V3 release certificate' \
+    "v3.1 must preserve the V3 signing line"
 else
   fail "unsupported Android versionCode; document migration and rollback expectations first"
 fi

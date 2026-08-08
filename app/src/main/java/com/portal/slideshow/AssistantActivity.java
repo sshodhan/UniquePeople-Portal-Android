@@ -8,6 +8,7 @@ import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
@@ -121,7 +122,10 @@ public class AssistantActivity extends Activity {
 
     private void loadAssistant() {
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
-        String url = p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL).trim();
+        String previewUrl = getIntent().getStringExtra("assistant_url");
+        String url = TextUtils.isEmpty(previewUrl)
+                ? p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL).trim()
+                : previewUrl.trim();
         if (url.length() == 0) url = MainActivity.DEFAULT_ASSISTANT_URL;
         Uri assistantUri = Uri.parse(url);
         if (assistantUri.getQueryParameter("deviceId") == null) {
