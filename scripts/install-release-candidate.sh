@@ -51,18 +51,19 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ -z "$SERIAL" ]; then
-  mapfile -t DEVICES < <(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }' | grep -v '^emulator-' || true)
-  if [ "${#DEVICES[@]}" -eq 0 ]; then
+  DEVICE_LIST="$(adb devices | awk 'NR > 1 && $2 == "device" && $1 !~ /^emulator-/ { print $1 }')"
+  DEVICE_COUNT="$(printf '%s\n' "$DEVICE_LIST" | awk 'NF { count++ } END { print count + 0 }')"
+  if [ "$DEVICE_COUNT" -eq 0 ]; then
     echo "ERROR: No physical Portal device found. Connect ADB or pass -s <serial>."
     adb devices
     exit 1
   fi
-  if [ "${#DEVICES[@]}" -gt 1 ]; then
+  if [ "$DEVICE_COUNT" -gt 1 ]; then
     echo "ERROR: More than one physical device is connected. Pass -s <serial>."
     adb devices
     exit 1
   fi
-  SERIAL="${DEVICES[0]}"
+  SERIAL="$(printf '%s\n' "$DEVICE_LIST" | awk 'NF { print; exit }')"
 fi
 
 echo "==> Target Portal: $SERIAL"
