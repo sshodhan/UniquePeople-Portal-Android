@@ -87,6 +87,8 @@ public class MainActivity extends Activity {
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
     static final String DEFAULT_CLOCK_COLOR = "#39FF14";
+    static final String DEFAULT_WEATHER_LOCATION = "Vienna, VA";
+    static final String DEFAULT_WEATHER_TILE_TEXT = "Weather\nVienna, VA\nWaiting for data";
     static final int DEFAULT_CLOCK_TEXT_SIZE_SP = 42;
     static final int MIN_CLOCK_TEXT_SIZE_SP = 24;
     static final int MAX_CLOCK_TEXT_SIZE_SP = 72;
@@ -644,10 +646,10 @@ public class MainActivity extends Activity {
         clockChrome.setText(clockSpan);
         String displayName = p.getString(KEY_DEVICE_FRIENDLY_NAME, "");
         greetingTile.setText(greetingFor(now) + "\n" + (TextUtils.isEmpty(displayName) ? "UniquePeople" : displayName));
-        weatherTile.setText("Weather\nNot set");
+        weatherTile.setText(DEFAULT_WEATHER_TILE_TEXT);
         setStocksTileText("Stocks\nNot set");
         birthdaysTile.setText("Birthdays\nNone today");
-        weatherTile.setText(p.getString(KEY_WEATHER_TILE_TEXT, "Weather\nNot set"));
+        weatherTile.setText(p.getString(KEY_WEATHER_TILE_TEXT, DEFAULT_WEATHER_TILE_TEXT));
         setStocksTileText(p.getString(KEY_STOCKS_TILE_TEXT, "Stocks\nNot set"));
 
         clockChrome.setVisibility(p.getBoolean(KEY_TILE_CLOCK_ENABLED, true) ? View.VISIBLE : View.GONE);
@@ -1048,7 +1050,7 @@ public class MainActivity extends Activity {
     }
 
     private static String formatWeatherTile(JSONObject weather) {
-        if (weather == null || !weather.optBoolean("enabled", false)) return "Weather\nNot set";
+        if (weather == null || !weather.optBoolean("enabled", false)) return DEFAULT_WEATHER_TILE_TEXT;
         String condition = weather.optString("condition", "Weather").toUpperCase(Locale.US);
         String icon = weather.optString("icon", "");
         int temp = weather.optInt("temperatureF", Integer.MIN_VALUE);
