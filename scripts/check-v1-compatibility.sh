@@ -78,6 +78,18 @@ elif grep -Fq 'android:versionCode="5"' "$MANIFEST"; then
     "v3.2 must preserve the stable release signing line"
   require_text "$STABILITY_DOC" 'V3.2 rollback rule' \
     "v3.2 requires documented rollback expectations"
+elif grep -Fq 'android:versionCode="6"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="3.3"' \
+    "v3.3 versionName must be 3.3"
+  require_text "$STABILITY_DOC" '## V3.3 Hosted Update Proof Release' \
+    "v3.3 version bump requires an explicit hosted update proof note"
+  require_text "$STABILITY_DOC" 'V3.3 signing rule' \
+    "v3.3 must preserve the stable release signing line"
+  require_text "$STABILITY_DOC" 'V3.3 rollback rule' \
+    "v3.3 requires documented rollback expectations"
+  require_text "$ROOT/app/src/main/java/com/portal/slideshow/SettingsActivity.java" \
+    'Hosted update verified' \
+    "v3.3 proof release must include a visible verification marker"
 else
   fail "unsupported Android versionCode; document migration and rollback expectations first"
 fi

@@ -61,6 +61,17 @@ V3.2 is the manually installed baseline that can discover, download, verify, and
 - V3.2 offline rule: metadata or download failure must not interrupt photos, tiles, settings, or the assistant. The user may dismiss optional update prompts.
 - V3.2 rollback rule: reinstall the preserved V3.1 release-signed APK. If Android blocks the version downgrade, stop and explain non-destructive options before uninstalling or clearing data.
 
+## V3.3 Hosted Update Proof Release
+
+V3.3 is the first release intended to prove the complete hosted update path from the manually installed V3.2 baseline. Its visible Settings footer reads `Hosted update verified` so successful installation can be confirmed without relying only on package metadata.
+
+- V3.3 Android versionCode: `6`
+- V3.3 Android versionName: `3.3`
+- V3.3 signing rule: build and distribute with the same stable V3 release certificate used by V3.2.
+- V3.3 hosted install rule: publish the immutable release APK and its verified metadata with `required=false`, then allow V3.2 to download, verify, and hand it to Android's package installer.
+- V3.3 verification rule: confirm the hosted file SHA-256 and certificate SHA-256 match the locally verified release artifact before enabling the manifest.
+- V3.3 rollback rule: preserve the installed V3.2 APK before the hosted update. If rollback is required and Android blocks the version downgrade, stop before uninstalling or clearing data.
+
 ## Must Not Break
 
 1. Preserve package name `com.portal.slideshow`.
