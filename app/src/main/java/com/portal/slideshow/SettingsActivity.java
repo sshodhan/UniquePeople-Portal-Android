@@ -130,7 +130,7 @@ public class SettingsActivity extends Activity {
         LinearLayout bar = row(); bar.setGravity(Gravity.CENTER_VERTICAL); bar.setPadding(dp(24), dp(20), dp(24), dp(20)); bar.setBackground(box(CARD, BORDER, 12));
         bar.addView(identity("DEVICE ID", draft.deviceId, TEXT), new LinearLayout.LayoutParams(0, -2, 1));
         bar.addView(divider(), new LinearLayout.LayoutParams(dp(1), dp(46)));
-        bar.addView(identity("CURRENT ALBUM", empty(draft.currentAlbumName) ? "No album selected" : draft.currentAlbumName, TEXT), new LinearLayout.LayoutParams(0, -2, 1.35f));
+        bar.addView(identity("CURRENT ALBUM", currentAlbumDisplay(), TEXT), new LinearLayout.LayoutParams(0, -2, 1.35f));
         bar.addView(divider(), new LinearLayout.LayoutParams(dp(1), dp(46)));
         bar.addView(identity("STATUS", "●  Connected", GREEN), new LinearLayout.LayoutParams(0, -2, .7f));
         return bar;
@@ -286,6 +286,7 @@ public class SettingsActivity extends Activity {
     private String orDefault(String value, String fallback) { return empty(value) ? fallback : value; }
     private boolean empty(String value) { return TextUtils.isEmpty(value); }
     private String deviceName() { return empty(draft.deviceName) ? "Family-Room-Portal" : draft.deviceName; }
+    private String currentAlbumDisplay() { if (!empty(draft.currentAlbumName)) return draft.currentAlbumName; if (!empty(draft.sharedAlbumUrl)) return draft.sharedAlbumUrl; return "No album selected"; }
     private String syncStatus() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0) > 0 ? "Synced just now" : "Connected"; }
     private boolean isPhotoHostMode() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS) == MainActivity.MODE_PHOTO_HOST; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
