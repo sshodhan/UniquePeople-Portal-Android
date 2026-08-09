@@ -34,7 +34,9 @@ final class AndroidUpdateManager {
     private static final int CONNECT_TIMEOUT_MS = 8000;
     private static final int READ_TIMEOUT_MS = 30000;
     private static boolean checkStarted;
+    private static boolean checkInProgress;
     private static File pendingApk;
+    private static boolean waitingForInstallPermission;
 
     private AndroidUpdateManager() { }
 
@@ -56,8 +58,49 @@ final class AndroidUpdateManager {
         }, "android-update-check").start();
     }
 
+    interface CheckCallback {
+        void onComplete(UpdateManifest manifest, boolean updateAvailable, String errorMessage);
+    }
+
+    static void checkNow(final Activity activity, final CheckCallback callback) {
+        if (activity == null || activity.isFinishing()) return;
+        synchronized (AndroidUpdateManager.class) {
+            if (checkInProgress) {
+                callback.onComplete(null, false, "An update check is already running.");
+                return;
+            }
+            checkInProgress = true;
+        }
+        new Thread(new Runnable() {
+            public void run() {
+                UpdateManifest result = null;
+                boolean available = false;
+                String error = null;
+                try {
+                    result = fetchManifest();
+                    available = result.enabled && result.versionCode > currentVersionCode(activity);
+                } catch (Exception failure) {
+                    error = failure.getMessage() == null ? "Could not check for updates." : failure.getMessage();
+                } finally {
+                    synchronized (AndroidUpdateManager.class) { checkInProgress = false; }
+                }
+                final UpdateManifest delivered = result;
+                final boolean deliveredAvailable = available;
+                final String deliveredError = error;
+                activity.runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (!activity.isFinishing() && !activity.isDestroyed()) {
+                            callback.onComplete(delivered, deliveredAvailable, deliveredError);
+                        }
+                    }
+                });
+            }
+        }, "android-update-manual-check").start();
+    }
+
     static boolean handleActivityResult(Activity activity, int requestCode) {
         if (requestCode != REQUEST_UNKNOWN_APP_SOURCE) return false;
+        waitingForInstallPermission = false;
         if (pendingApk == null || !pendingApk.isFile()) {
             Toast.makeText(activity, "The downloaded update is no longer available.", Toast.LENGTH_LONG).show();
             return true;
@@ -65,6 +108,13 @@ final class AndroidUpdateManager {
         if (canRequestInstalls(activity)) launchInstaller(activity, pendingApk);
         else Toast.makeText(activity, "Install permission was not enabled.", Toast.LENGTH_LONG).show();
         return true;
+    }
+
+    static void resumePendingInstall(Activity activity) {
+        if (!waitingForInstallPermission || activity == null || activity.isFinishing()) return;
+        if (!canRequestInstalls(activity)) return;
+        waitingForInstallPermission = false;
+        if (pendingApk != null && pendingApk.isFile()) launchInstaller(activity, pendingApk);
     }
 
     private static UpdateManifest fetchManifest() throws Exception {
@@ -78,7 +128,7 @@ final class AndroidUpdateManager {
         return UpdateManifest.parse(new JSONObject(body));
     }
 
-    private static void showAvailable(final Activity activity, final UpdateManifest manifest) {
+    static void showAvailable(final Activity activity, final UpdateManifest manifest) {
         String message = "UniquePeople " + manifest.versionName + " is available.";
         if (!TextUtils.isEmpty(manifest.releaseNotes)) message += "\n\n" + manifest.releaseNotes;
         AlertDialog dialog = new AlertDialog.Builder(activity)
@@ -142,6 +192,7 @@ final class AndroidUpdateManager {
     }
 
     private static void requestUnknownSourcePermission(Activity activity) {
+        waitingForInstallPermission = true;
         Intent intent = new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
                 Uri.parse("package:" + activity.getPackageName()));
         activity.startActivityForResult(intent, REQUEST_UNKNOWN_APP_SOURCE);
@@ -191,7 +242,8 @@ final class AndroidUpdateManager {
     private static void verifyApk(Activity activity, File apk, UpdateManifest manifest) throws Exception {
         if (!sha256(apk).equals(manifest.sha256)) throw new Exception("The downloaded update checksum does not match.");
         PackageManager pm = activity.getPackageManager();
-        PackageInfo archive = pm.getPackageArchiveInfo(apk.getAbsolutePath(), PackageManager.GET_SIGNING_CERTIFICATES);
+        PackageInfo archive = pm.getPackageArchiveInfo(apk.getAbsolutePath(),
+                PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_SIGNATURES);
         if (archive == null) throw new Exception("Android could not read the downloaded APK.");
         if (!PACKAGE_NAME.equals(archive.packageName) || !manifest.packageName.equals(archive.packageName)) {
             throw new Exception("The downloaded APK has the wrong package name.");
@@ -201,7 +253,8 @@ final class AndroidUpdateManager {
             throw new Exception("The downloaded APK has an unexpected version.");
         }
         String archiveCertificate = certificateSha256(archive);
-        PackageInfo installed = pm.getPackageInfo(PACKAGE_NAME, PackageManager.GET_SIGNING_CERTIFICATES);
+        PackageInfo installed = pm.getPackageInfo(PACKAGE_NAME,
+                PackageManager.GET_SIGNING_CERTIFICATES | PackageManager.GET_SIGNATURES);
         String installedCertificate = certificateSha256(installed);
         if (!archiveCertificate.equals(manifest.certificateSha256)
                 || !archiveCertificate.equals(installedCertificate)) {
@@ -217,12 +270,8 @@ final class AndroidUpdateManager {
     private static String certificateSha256(PackageInfo info) throws Exception {
         Signature[] signatures;
         if (Build.VERSION.SDK_INT >= 28 && info.signingInfo != null) {
-            signatures = info.signingInfo.hasMultipleSigners()
-                    ? info.signingInfo.getApkContentsSigners()
-                    : info.signingInfo.getSigningCertificateHistory();
-        } else {
-            signatures = info.signatures;
-        }
+            signatures = info.signingInfo.getApkContentsSigners();
+        } else signatures = info.signatures;
         if (signatures == null || signatures.length != 1) throw new Exception("Expected exactly one APK signer.");
         return hex(MessageDigest.getInstance("SHA-256").digest(signatures[0].toByteArray()));
     }
