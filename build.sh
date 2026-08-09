@@ -51,14 +51,16 @@ OUT="build"
 rm -rf "$OUT"; mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/assets"
 
 # ---- 5. Compile + link resources (produces base APK with manifest+icon) ----
-# Bundle non-video assets in every build. Bundle the local video unless
-# INCLUDE_VIDEO=0 (use 0 to make a shareable copy without a personal video).
+# Bundle personal fallback media for local builds. INCLUDE_VIDEO=0 creates the
+# shareable build and excludes both the personal video and default photo set.
 ASSET_ARGS=""
 if [ -d app/src/main/assets ]; then
   ( cd app/src/main/assets
     find . -type f | while read -r asset; do
-      if [ "${INCLUDE_VIDEO:-1}" = "0" ] && [ "$asset" = "./slideshow.mp4" ]; then
-        continue
+      if [ "${INCLUDE_VIDEO:-1}" = "0" ]; then
+        case "$asset" in
+          ./slideshow.mp4|./default_photos/*) continue ;;
+        esac
       fi
       dest="$ROOT/$OUT/assets/${asset#./}"
       mkdir -p "$(dirname "$dest")"
@@ -72,7 +74,7 @@ fi
 if [ "${INCLUDE_VIDEO:-1}" != "0" ] && [ -f app/src/main/assets/slideshow.mp4 ]; then
   echo "video:      bundled  (run 'INCLUDE_VIDEO=0 bash build.sh' for a shareable copy without it)"
 else
-  echo "video:      NOT bundled (shareable build -- users set their own URL in Settings)"
+  echo "media:      personal video and default photos NOT bundled (shareable build)"
 fi
 echo "==> aapt2 compile"
 "$AAPT2" compile --dir app/src/main/res -o "$OUT/res.zip"

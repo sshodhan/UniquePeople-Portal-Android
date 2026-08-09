@@ -13,7 +13,7 @@ UniquePeople v1 is live on one customer Portal. We should keep innovating, but i
 - Customer Portal app device ID: `UP-DDA36346F304`
 - Known-good Android commit: `392ea76 Reduce clock overlay coverage`
 - APK path after build: `app-debug.apk`
-- Build command for shareable APKs: `INCLUDE_VIDEO=0 ./build.sh`
+- Build command for shareable APKs: `INCLUDE_VIDEO=0 ./build.sh` (excludes the personal video and default photos)
 - Release-signed APK path after build: `app-release.apk`
 - Release-signed build command: `INCLUDE_VIDEO=0 UNIQUEPEOPLE_RELEASE=1 ./build.sh`
 
@@ -74,8 +74,10 @@ V3.1 is an in-place update on the V3 release-signed distribution line. It preser
 
 ## Current Defaults
 
+- V3.1 default album rule: the fallback album changes only for installs without a saved or remotely configured album. Existing `album_url` preferences and valid remote `albumUrl` values must continue to win.
+
 - Default album URL:
-  `https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA`
+  `https://photos.app.goo.gl/3BjJ4L2MdXJiZQ6P6`
 - Default settings base URL:
   `https://uniquepeople-web.vercel.app/settings`
 - Default assistant URL:

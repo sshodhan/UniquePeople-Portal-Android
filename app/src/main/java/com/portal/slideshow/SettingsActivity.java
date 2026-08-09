@@ -23,6 +23,7 @@ import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
+import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -51,15 +52,17 @@ public class SettingsActivity extends Activity {
     private TextView setupNav, advancedNav, sideDevice, sideStatus;
     private RadioButton nativeMode, webMode;
     private EditText photoHostField, videoField, assistantField;
+    private Switch photoHostToggle;
     private PortalSettings draft;
     private boolean advanced;
-    private boolean albumScanned;
+    private boolean photoHostEnabled;
     private final Set<String> enabledTiles = new HashSet<String>();
     private final Map<String, TextView> chips = new HashMap<String, TextView>();
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
         draft = readSettings();
+        photoHostEnabled = isPhotoHostMode();
         setContentView(shell());
         showSetup();
     }
@@ -116,7 +119,7 @@ public class SettingsActivity extends Activity {
         LinearLayout card = row(); card.setGravity(Gravity.CENTER_VERTICAL); card.setPadding(dp(34), dp(30), dp(34), dp(30)); card.setBackground(box(CARD, BORDER, 16));
         LinearLayout copy = column(); copy.addView(eyebrow("THIS SMART DISPLAY")); copy.addView(txt(deviceName(), 31, TEXT, true), top(8));
         TextView desc = txt("Scan this code to easily manage photos, linked accounts, and custom integrations from your phone or browser.", 16, MUTED, false);
-        desc.setLineSpacing(0, 1.12f); copy.addView(desc, top(12)); copy.addView(txt("portal.uniquepeople.com/setup", 15, TEAL, true), top(18));
+        desc.setLineSpacing(0, 1.12f); copy.addView(desc, top(12)); copy.addView(txt("https://uniquepeople-web.vercel.app/settings", 15, TEAL, true), top(18));
         card.addView(copy, new LinearLayout.LayoutParams(0, -2, 1));
         ImageView qr = new ImageView(this); qr.setPadding(dp(10), dp(10), dp(10), dp(10)); qr.setBackgroundColor(Color.WHITE); qr.setImageBitmap(makeQr(MainActivity.buildPairingUrl(this), 420));
         card.addView(qr, new LinearLayout.LayoutParams(dp(220), dp(220)));
@@ -161,9 +164,20 @@ public class SettingsActivity extends Activity {
         content.addView(txt("Manual URLs, fallback options, and assistant configuration.", 16, MUTED, false), top(8));
         LinearLayout cards = row(); cards.setGravity(Gravity.TOP);
         LinearLayout left = advancedCard("PHOTOS & VIDEO SLIDESHOW", "Photo Host & Fallbacks");
+        LinearLayout hostMode = row(); hostMode.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout hostModeCopy = column();
+        hostModeCopy.addView(fieldLabel("Photo Host viewer mode"));
+        hostModeCopy.addView(txt("Off uses Google Photos/Drive directly. On tries the Photo Host viewer.", 13, MUTED, false), top(5));
+        hostMode.addView(hostModeCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        photoHostToggle = new Switch(this);
+        photoHostToggle.setContentDescription("Photo Host viewer mode");
+        photoHostToggle.setChecked(photoHostEnabled);
+        photoHostToggle.setShowText(false);
+        hostMode.addView(photoHostToggle, new LinearLayout.LayoutParams(dp(72), dp(52)));
+        left.addView(hostMode, top(22));
         photoHostField = input("Photo Host URL", "https://photos.example.com/slideshow", draft.photoHostUrl);
         videoField = input("Video Fallback URL", "https://example.com/fallback.mp4", draft.videoFallbackUrl);
-        left.addView(fieldLabel("Photo Host URL"), top(22)); left.addView(photoHostField, inputParams());
+        left.addView(fieldLabel("Photo Host URL"), top(18)); left.addView(photoHostField, inputParams());
         left.addView(fieldLabel("Video Fallback URL"), top(18)); left.addView(videoField, inputParams());
         left.addView(txt("Used when the primary content source is unavailable", 13, MUTED, false), top(14));
         LinearLayout right = advancedCard("PORTAL ASSISTANT", "Assistant Integration");
@@ -207,7 +221,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void captureSetup() { if (advanced || nativeMode == null) return; draft = copy(draft.sharedAlbumUrl, webMode.isChecked() ? PortalSettings.TileMode.WEB_DRIVEN : PortalSettings.TileMode.NATIVE, enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); }
-    private void captureAdvanced() { if (!advanced || photoHostField == null) return; draft = copy(draft.sharedAlbumUrl, draft.tileMode, draft.enabledTiles, value(photoHostField), value(videoField), value(assistantField)); }
+    private void captureAdvanced() { if (!advanced || photoHostField == null) return; photoHostEnabled = photoHostToggle != null && photoHostToggle.isChecked(); draft = copy(draft.sharedAlbumUrl, draft.tileMode, draft.enabledTiles, value(photoHostField), value(videoField), value(assistantField)); }
 
     private void save() {
         if (advanced) captureAdvanced(); else captureSetup();
@@ -222,15 +236,15 @@ public class SettingsActivity extends Activity {
                 .putBoolean(MainActivity.KEY_TILE_GREETING_ENABLED, draft.enabledTiles.contains("daily_greeting"))
                 .putBoolean(MainActivity.KEY_TILE_WEATHER_ENABLED, draft.enabledTiles.contains("weather"))
                 .putBoolean(MainActivity.KEY_TILE_STOCKS_ENABLED, draft.enabledTiles.contains("markets"))
-                .putBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, draft.enabledTiles.contains("birthdays"));
-        if (albumScanned) editor.putInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS);
+                .putBoolean(MainActivity.KEY_TILE_BIRTHDAYS_ENABLED, draft.enabledTiles.contains("birthdays"))
+                .putInt(MainActivity.KEY_MODE, photoHostEnabled ? MainActivity.MODE_PHOTO_HOST : MainActivity.MODE_GOOGLE_PHOTOS);
         editor.apply();
         setResult(RESULT_OK); finish();
     }
 
     private void refresh(final View button) {
         button.setEnabled(false); MainActivity.refreshRemoteConfigAsync(this, new MainActivity.RemoteConfigCallback() { public void onComplete(boolean ok, String message) {
-            button.setEnabled(true); if (ok) { draft = readSettings(); sideDevice.setText(deviceName()); sideStatus.setText("●  Synced just now"); if (advanced) showAdvanced(); else showSetup(); } Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+            button.setEnabled(true); if (ok) { draft = readSettings(); photoHostEnabled = isPhotoHostMode(); sideDevice.setText(deviceName()); sideStatus.setText("●  Synced just now"); if (advanced) showAdvanced(); else showSetup(); } Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
         }});
     }
 
@@ -239,7 +253,7 @@ public class SettingsActivity extends Activity {
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data); if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
             String album = data == null ? null : data.getStringExtra("album_url"); if (empty(album)) album = MainActivity.getAlbumUrl(getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE));
-            draft = copy(album, draft.tileMode, draft.enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); albumScanned = true; Toast.makeText(this, "Album ready. Save & play to connect it.", Toast.LENGTH_LONG).show(); showSetup();
+            draft = copy(album, draft.tileMode, draft.enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); Toast.makeText(this, "Album ready. Save & play to connect it.", Toast.LENGTH_LONG).show(); showSetup();
         }
     }
 
@@ -273,5 +287,6 @@ public class SettingsActivity extends Activity {
     private boolean empty(String value) { return TextUtils.isEmpty(value); }
     private String deviceName() { return empty(draft.deviceName) ? "Family-Room-Portal" : draft.deviceName; }
     private String syncStatus() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0) > 0 ? "Synced just now" : "Connected"; }
+    private boolean isPhotoHostMode() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS) == MainActivity.MODE_PHOTO_HOST; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }

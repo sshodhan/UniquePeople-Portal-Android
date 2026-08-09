@@ -84,7 +84,7 @@ public class MainActivity extends Activity {
     static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";
     static final String DEFAULT_DASHBOARD_DATA_URL = "https://uniquepeople-web.vercel.app/api/dashboard-data";
     static final String DEFAULT_HOSTED_TILES_URL = "https://uniquepeople-web.vercel.app/tiles";
-    static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";
+    static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/3BjJ4L2MdXJiZQ6P6";
     static final String DEFAULT_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     static final String DEFAULT_PHOTO_HOST_URL = "https://uniquepeople-web.vercel.app/photo-host";
     static final String DEFAULT_CLOCK_COLOR = "#39FF14";

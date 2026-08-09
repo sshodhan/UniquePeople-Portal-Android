@@ -42,6 +42,9 @@ V3 starts the release-signed distribution line for family installs and future ho
 INCLUDE_VIDEO=0 UNIQUEPEOPLE_RELEASE=1 ./build.sh
 ```
 
+`INCLUDE_VIDEO=0` is the distribution-safe build: it excludes both the personal
+video and the bundled default photo set.
+
 The release APK is written to `app-release.apk`.
 
 Existing debug-signed V1/V2 installs cannot update directly to release-signed V3. Treat that as a planned one-time migration and preserve a rollback APK before attempting it.

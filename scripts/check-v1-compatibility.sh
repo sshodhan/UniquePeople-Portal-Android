@@ -85,8 +85,10 @@ require_text "$MAIN" 'static final String DEFAULT_SETTINGS_BASE_URL = "https://u
   "settings URL changed; update v1 stability notes and test before shipping"
 require_text "$MAIN" 'static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";' \
   "remote config endpoint changed; v1 web config compatibility is at risk"
-require_text "$MAIN" 'static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/qsgZFqbeTfpmWUvdA";' \
+require_text "$MAIN" 'static final String DEFAULT_ALBUM_URL = "https://photos.app.goo.gl/3BjJ4L2MdXJiZQ6P6";' \
   "default album URL changed; document migration and test fallback behavior"
+require_text "$STABILITY_DOC" 'V3.1 default album rule' \
+  "default album change requires documented preservation of saved and remote album values"
 require_text "$MAIN" 'static final String DEFAULT_CLOCK_COLOR = "#39FF14";' \
   "default classic green clock color changed"
 require_text "$MAIN" 'static final int MODE_GOOGLE_PHOTOS = 3;' \
