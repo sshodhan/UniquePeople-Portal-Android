@@ -11,16 +11,18 @@ ENV_FILE="${UNIQUEPEOPLE_RELEASE_ENV:-/Users/saralshodhan/projects/Release/Uniqu
 ROLLBACK_ROOT="${UNIQUEPEOPLE_ROLLBACK_ROOT:-/Users/saralshodhan/projects/Release/UniquePeopleRelease/rollback}"
 SERIAL=""
 SKIP_BUILD=0
+APK_PATH="app-release.apk"
 
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/install-release-candidate.sh [-s DEVICE_SERIAL] [--skip-build]
+  scripts/install-release-candidate.sh [-s DEVICE_SERIAL] [--skip-build] [--apk APK_PATH]
 
 Examples:
   scripts/install-release-candidate.sh
   scripts/install-release-candidate.sh -s 818PGA02P120ML06
   scripts/install-release-candidate.sh -s 818PGA02P120ML06 --skip-build
+  scripts/install-release-candidate.sh -s 818PGA02P120ML06 --skip-build --apk /path/to/app-release.apk
 
 Environment:
   UNIQUEPEOPLE_RELEASE_ENV   Defaults to /Users/saralshodhan/projects/Release/UniquePeopleRelease/secure/release.env
@@ -37,6 +39,11 @@ while [ "$#" -gt 0 ]; do
     --skip-build)
       SKIP_BUILD=1
       shift
+      ;;
+    --apk)
+      APK_PATH="${2:-}"
+      SKIP_BUILD=1
+      shift 2
       ;;
     -h|--help)
       usage
@@ -85,18 +92,18 @@ if [ "$SKIP_BUILD" -eq 0 ]; then
   INCLUDE_VIDEO=0 UNIQUEPEOPLE_RELEASE=1 ./build.sh
 fi
 
-if [ ! -f app-release.apk ]; then
-  echo "ERROR: app-release.apk was not found."
+if [ ! -f "$APK_PATH" ]; then
+  echo "ERROR: APK was not found: $APK_PATH"
   exit 1
 fi
 
 echo "==> New APK metadata"
 if command -v aapt2 >/dev/null 2>&1; then
-  aapt2 dump badging app-release.apk | sed -n '1,3p'
+  aapt2 dump badging "$APK_PATH" | sed -n '1,3p'
 else
   SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}"
   AAPT2="$(ls -d "$SDK"/build-tools/*/aapt2 2>/dev/null | sort -V | tail -1)"
-  if [ -x "$AAPT2" ]; then "$AAPT2" dump badging app-release.apk | sed -n '1,3p'; fi
+  if [ -x "$AAPT2" ]; then "$AAPT2" dump badging "$APK_PATH" | sed -n '1,3p'; fi
 fi
 
 echo "==> Installed package before install"
@@ -114,7 +121,7 @@ else
 fi
 
 echo "==> Installing release candidate"
-adb -s "$SERIAL" install -r app-release.apk
+adb -s "$SERIAL" install -r "$APK_PATH"
 
 echo "==> Installed package after install"
 adb -s "$SERIAL" shell dumpsys package "$PKG" | sed -n '/versionCode=/p;/versionName=/p;/firstInstallTime=/p;/lastUpdateTime=/p'

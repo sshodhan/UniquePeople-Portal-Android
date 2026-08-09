@@ -3,6 +3,7 @@ package com.portal.slideshow;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageInfo;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -12,6 +13,7 @@ import android.os.Bundle;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
@@ -49,12 +51,17 @@ public class SettingsActivity extends Activity {
     private static final int GREEN = Color.rgb(77, 214, 143);
 
     private FrameLayout contentHost;
-    private TextView setupNav, advancedNav, sideDevice, sideStatus;
+    private TextView setupNav, advancedNav, updatesNav, sideDevice, sideStatus;
+    private TextView updateStatus, updateDetails;
+    private Button checkUpdateButton, installUpdateButton;
     private RadioButton nativeMode, webMode;
     private EditText photoHostField, videoField, assistantField;
     private Switch photoHostToggle;
     private PortalSettings draft;
     private boolean advanced;
+    private boolean updates;
+    private float updatePullStartY;
+    private AndroidUpdateManager.UpdateManifest availableUpdate;
     private boolean photoHostEnabled;
     private final Set<String> enabledTiles = new HashSet<String>();
     private final Map<String, TextView> chips = new HashMap<String, TextView>();
@@ -82,11 +89,12 @@ public class SettingsActivity extends Activity {
     private View sidebar() {
         LinearLayout side = column(); side.setPadding(dp(34), dp(34), dp(24), dp(28)); side.setBackgroundColor(SIDE);
         side.addView(txt("UniquePeople", 25, TEXT, true));
-        TextView sub = txt("V3.3 Portal settings", 14, MUTED, false); side.addView(sub, top(5));
-        setupNav = nav("Setup"); advancedNav = nav("Advanced");
-        side.addView(setupNav, top(54)); side.addView(advancedNav, full());
+        TextView sub = txt("V" + installedVersionName() + " Portal settings", 14, MUTED, false); side.addView(sub, top(5));
+        setupNav = nav("Setup"); advancedNav = nav("Advanced"); updatesNav = nav("Updates");
+        side.addView(setupNav, top(54)); side.addView(advancedNav, full()); side.addView(updatesNav, full());
         setupNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showSetup(); }});
         advancedNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAdvanced(); }});
+        updatesNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showUpdates(); }});
         side.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
         LinearLayout device = column(); device.setPadding(dp(16), dp(16), dp(16), dp(16)); device.setBackground(box(CARD, BORDER, 12));
         sideDevice = txt(deviceName(), 15, TEXT, true); device.addView(sideDevice);
@@ -97,7 +105,7 @@ public class SettingsActivity extends Activity {
 
     private View footer() {
         LinearLayout footer = row(); footer.setGravity(Gravity.CENTER_VERTICAL); footer.setPadding(dp(30), dp(12), dp(30), dp(12)); footer.setBackgroundColor(SIDE);
-        footer.addView(txt("UniquePeople 3.3  •  Hosted update verified", 13, GREEN, false), new LinearLayout.LayoutParams(0, -2, 1));
+        footer.addView(txt(buildLabel(), 13, GREEN, false), new LinearLayout.LayoutParams(0, -2, 1));
         Button refresh = button("Refresh from web", false), cancel = button("Cancel", false), save = button("Save & play", true);
         refresh.setOnClickListener(new View.OnClickListener() { public void onClick(final View v) { refresh(v); }});
         cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }});
@@ -107,7 +115,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void showSetup() {
-        captureAdvanced(); advanced = false; styleNav(); contentHost.removeAllViews();
+        captureCurrent(); advanced = false; updates = false; styleNav(); contentHost.removeAllViews();
         LinearLayout content = page();
         content.addView(hero()); content.addView(identityBar(), top(18));
         content.addView(txt("Scan Album", 20, TEXT, true), section()); content.addView(scanCard());
@@ -159,7 +167,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void showAdvanced() {
-        captureSetup(); advanced = true; styleNav(); contentHost.removeAllViews();
+        captureCurrent(); advanced = true; updates = false; styleNav(); contentHost.removeAllViews();
         LinearLayout content = page(); content.addView(txt("Advanced Settings", 31, TEXT, true));
         content.addView(txt("Manual URLs, fallback options, and assistant configuration.", 16, MUTED, false), top(8));
         LinearLayout cards = row(); cards.setGravity(Gravity.TOP);
@@ -189,9 +197,63 @@ public class SettingsActivity extends Activity {
         cards.addView(left, leftLp); cards.addView(right, rightLp); content.addView(cards, top(34)); mount(content);
     }
 
+    private void showUpdates() {
+        captureCurrent(); advanced = false; updates = true; styleNav(); contentHost.removeAllViews();
+        LinearLayout content = page();
+        content.addView(txt("Updates", 31, TEXT, true));
+        content.addView(txt("View this Portal's installed build and check the hosted release channel.", 16, MUTED, false), top(8));
+
+        LinearLayout build = advancedCard("INSTALLED BUILD", "UniquePeople " + installedVersionName());
+        build.addView(txt("Version code " + installedVersionCode(), 16, TEXT, true), top(18));
+        build.addView(txt("Package com.portal.slideshow", 14, MUTED, false), top(7));
+        build.addView(txt("Release verification remains enforced for every downloaded APK.", 14, GREEN, false), top(14));
+        content.addView(build, top(30));
+
+        LinearLayout status = advancedCard("UPDATE CHANNEL", "Hosted updates");
+        updateStatus = txt("Ready to check", 18, TEXT, true); status.addView(updateStatus, top(18));
+        updateDetails = txt(lastUpdateCheckText(), 14, MUTED, false); updateDetails.setLineSpacing(0, 1.12f); status.addView(updateDetails, top(8));
+        checkUpdateButton = button("Check for updates", true);
+        checkUpdateButton.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { checkForUpdates(); }});
+        LinearLayout.LayoutParams checkLp = new LinearLayout.LayoutParams(dp(220), dp(56)); checkLp.topMargin = dp(22); status.addView(checkUpdateButton, checkLp);
+        installUpdateButton = button("Download and install", true); installUpdateButton.setVisibility(View.GONE);
+        installUpdateButton.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { if (availableUpdate != null) AndroidUpdateManager.showAvailable(SettingsActivity.this, availableUpdate); }});
+        LinearLayout.LayoutParams installLp = new LinearLayout.LayoutParams(dp(240), dp(56)); installLp.topMargin = dp(12); status.addView(installUpdateButton, installLp);
+        status.addView(txt("Pull down from the top of this page to check again.", 13, MUTED, false), top(18));
+        content.addView(status, top(18));
+        mount(content);
+    }
+
+    private void checkForUpdates() {
+        if (checkUpdateButton == null || !checkUpdateButton.isEnabled()) return;
+        checkUpdateButton.setEnabled(false); installUpdateButton.setVisibility(View.GONE); availableUpdate = null;
+        updateStatus.setText("Checking…"); updateStatus.setTextColor(TEXT); updateDetails.setText("Contacting the hosted update service.");
+        AndroidUpdateManager.checkNow(this, new AndroidUpdateManager.CheckCallback() {
+            public void onComplete(AndroidUpdateManager.UpdateManifest manifest, boolean available, String error) {
+                checkUpdateButton.setEnabled(true);
+                if (error != null) {
+                    updateStatus.setText("Check failed"); updateStatus.setTextColor(Color.rgb(255, 145, 125)); updateDetails.setText(error + "\nPull down or tap Check for updates to retry."); return;
+                }
+                getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit().putLong("android_update_last_check_ms", System.currentTimeMillis()).apply();
+                if (available) {
+                    availableUpdate = manifest; updateStatus.setText("Update available"); updateStatus.setTextColor(GREEN);
+                    updateDetails.setText("UniquePeople " + manifest.versionName + " (version code " + manifest.versionCode + ")\n" + (empty(manifest.releaseNotes) ? "A newer verified build is ready." : manifest.releaseNotes));
+                    installUpdateButton.setVisibility(View.VISIBLE);
+                } else {
+                    updateStatus.setText("UniquePeople is up to date"); updateStatus.setTextColor(GREEN);
+                    updateDetails.setText("Installed build " + installedVersionName() + " (version code " + installedVersionCode() + ") is current.");
+                }
+            }
+        });
+    }
+
     private void mount(LinearLayout content) {
         FrameLayout page = new FrameLayout(this); page.setBackgroundColor(BG);
-        ScrollView scroll = new ScrollView(this); scroll.addView(content); page.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        final ScrollView scroll = new ScrollView(this); scroll.addView(content); page.addView(scroll, new FrameLayout.LayoutParams(-1, -1));
+        if (updates) scroll.setOnTouchListener(new View.OnTouchListener() { public boolean onTouch(View v, MotionEvent event) {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) updatePullStartY = event.getY();
+            if (event.getAction() == MotionEvent.ACTION_UP && scroll.getScrollY() == 0 && event.getY() - updatePullStartY > dp(80)) checkForUpdates();
+            return false;
+        }});
         TextView close = txt("×  Close Settings", 14, MUTED, true); close.setGravity(Gravity.CENTER); close.setBackground(box(BG, BORDER, 8)); close.setClickable(true); close.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }});
         FrameLayout.LayoutParams closeLp = new FrameLayout.LayoutParams(dp(170), dp(48)); closeLp.gravity = Gravity.TOP | Gravity.RIGHT; closeLp.topMargin = dp(28); closeLp.rightMargin = dp(36); page.addView(close, closeLp);
         contentHost.addView(page, new FrameLayout.LayoutParams(-1, -1));
@@ -222,9 +284,10 @@ public class SettingsActivity extends Activity {
 
     private void captureSetup() { if (advanced || nativeMode == null) return; draft = copy(draft.sharedAlbumUrl, webMode.isChecked() ? PortalSettings.TileMode.WEB_DRIVEN : PortalSettings.TileMode.NATIVE, enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); }
     private void captureAdvanced() { if (!advanced || photoHostField == null) return; photoHostEnabled = photoHostToggle != null && photoHostToggle.isChecked(); draft = copy(draft.sharedAlbumUrl, draft.tileMode, draft.enabledTiles, value(photoHostField), value(videoField), value(assistantField)); }
+    private void captureCurrent() { if (advanced) captureAdvanced(); else if (!updates) captureSetup(); }
 
     private void save() {
-        if (advanced) captureAdvanced(); else captureSetup();
+        captureCurrent();
         if (!optionalUrl(draft.photoHostUrl, "Photo Host URL") || !optionalUrl(draft.videoFallbackUrl, "Video Fallback URL") || !optionalUrl(draft.assistantUrl, "Assistant URL")) return;
         SharedPreferences.Editor editor = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
                 .putString(MainActivity.KEY_ALBUM_URL, safe(draft.sharedAlbumUrl))
@@ -251,15 +314,28 @@ public class SettingsActivity extends Activity {
     private void openAssistant() { captureAdvanced(); if (!optionalUrl(draft.assistantUrl, "Assistant URL")) return; Intent i = new Intent(this, AssistantActivity.class); i.putExtra("assistant_url", orDefault(draft.assistantUrl, MainActivity.DEFAULT_ASSISTANT_URL)); startActivity(i); }
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data); if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (AndroidUpdateManager.handleActivityResult(this, requestCode)) return;
+        if (requestCode == REQ_QR_SCAN && resultCode == RESULT_OK) {
             String album = data == null ? null : data.getStringExtra("album_url"); if (empty(album)) album = MainActivity.getAlbumUrl(getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE));
             draft = copy(album, draft.tileMode, draft.enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); Toast.makeText(this, "Album ready. Save & play to connect it.", Toast.LENGTH_LONG).show(); showSetup();
         }
     }
 
+    @Override protected void onResume() {
+        super.onResume();
+        AndroidUpdateManager.resumePendingInstall(this);
+    }
+
     private void addChip(LinearLayout row, final String key, String label) { final TextView chip = txt(label, 14, TEXT, true); chip.setGravity(Gravity.CENTER); chip.setPadding(dp(18), 0, dp(18), 0); chip.setClickable(true); chips.put(key, chip); styleChip(chip, enabledTiles.contains(key)); chip.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { if (enabledTiles.contains(key)) enabledTiles.remove(key); else enabledTiles.add(key); styleChip(chip, enabledTiles.contains(key)); }}); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(48)); lp.rightMargin = dp(10); row.addView(chip, lp); }
     private void styleChip(TextView chip, boolean enabled) { chip.setTextColor(enabled ? TEXT : MUTED); chip.setBackground(box(enabled ? Color.rgb(20, 76, 75) : BG, enabled ? TEAL : BORDER, 24)); }
-    private void styleNav() { setupNav.setTextColor(advanced ? MUTED : TEXT); advancedNav.setTextColor(advanced ? TEXT : MUTED); setupNav.setBackground(box(advanced ? SIDE : Color.rgb(18, 55, 57), advanced ? SIDE : TEAL, 8)); advancedNav.setBackground(box(advanced ? Color.rgb(18, 55, 57) : SIDE, advanced ? TEAL : SIDE, 8)); }
+    private void styleNav() {
+        boolean setup = !advanced && !updates;
+        setupNav.setTextColor(setup ? TEXT : MUTED); advancedNav.setTextColor(advanced ? TEXT : MUTED); updatesNav.setTextColor(updates ? TEXT : MUTED);
+        setupNav.setBackground(box(setup ? Color.rgb(18, 55, 57) : SIDE, setup ? TEAL : SIDE, 8));
+        advancedNav.setBackground(box(advanced ? Color.rgb(18, 55, 57) : SIDE, advanced ? TEAL : SIDE, 8));
+        updatesNav.setBackground(box(updates ? Color.rgb(18, 55, 57) : SIDE, updates ? TEAL : SIDE, 8));
+    }
 
     private Bitmap makeQr(String value, int size) { try { BitMatrix bits = new QRCodeWriter().encode(value, BarcodeFormat.QR_CODE, size, size); Bitmap image = Bitmap.createBitmap(size, size, Bitmap.Config.RGB_565); for (int y = 0; y < size; y++) for (int x = 0; x < size; x++) image.setPixel(x, y, bits.get(x, y) ? Color.BLACK : Color.WHITE); return image; } catch (Exception e) { return null; } }
     private LinearLayout identity(String label, String value, int color) { LinearLayout item = column(); item.setPadding(dp(18), 0, dp(18), 0); item.addView(eyebrow(label)); item.addView(txt(value, 15, color, true), top(6)); return item; }
@@ -288,6 +364,10 @@ public class SettingsActivity extends Activity {
     private String deviceName() { return empty(draft.deviceName) ? "Family-Room-Portal" : draft.deviceName; }
     private String currentAlbumDisplay() { if (!empty(draft.currentAlbumName)) return draft.currentAlbumName; if (!empty(draft.sharedAlbumUrl)) return draft.sharedAlbumUrl; return "No album selected"; }
     private String syncStatus() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getLong(MainActivity.KEY_LAST_REMOTE_REFRESH_MS, 0) > 0 ? "Synced just now" : "Connected"; }
+    private String installedVersionName() { try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; } catch (Exception ignored) { return "Unknown"; } }
+    private long installedVersionCode() { try { PackageInfo info = getPackageManager().getPackageInfo(getPackageName(), 0); return android.os.Build.VERSION.SDK_INT >= 28 ? info.getLongVersionCode() : info.versionCode; } catch (Exception ignored) { return 0; } }
+    private String buildLabel() { return "UniquePeople " + installedVersionName() + "  •  Build " + installedVersionCode(); }
+    private String lastUpdateCheckText() { long value = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getLong("android_update_last_check_ms", 0); return value == 0 ? "No manual update check has run yet." : "Last checked " + android.text.format.DateUtils.getRelativeTimeSpanString(value); }
     private boolean isPhotoHostMode() { return getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).getInt(MainActivity.KEY_MODE, MainActivity.MODE_GOOGLE_PHOTOS) == MainActivity.MODE_PHOTO_HOST; }
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
 }

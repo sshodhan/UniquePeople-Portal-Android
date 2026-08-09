@@ -53,6 +53,8 @@ V3.2 (`versionCode 5`) is the manually installed hosted-updater baseline. It che
 
 V3.3 (`versionCode 6`) is the hosted-update proof release. Its Settings footer includes `Hosted update verified`, providing a visible confirmation after a successful V3.2-to-V3.3 update.
 
+V3.4 (`versionCode 7`) adds Settings > Updates with installed build details, manual and pull-down checks, and installer resumption after unknown-source permission is granted. It remains on the stable V3 release-signing line and preserves existing Portal settings during an in-place hosted update.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).

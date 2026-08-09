@@ -90,6 +90,19 @@ elif grep -Fq 'android:versionCode="6"' "$MANIFEST"; then
   require_text "$ROOT/app/src/main/java/com/portal/slideshow/SettingsActivity.java" \
     'Hosted update verified' \
     "v3.3 proof release must include a visible verification marker"
+elif grep -Fq 'android:versionCode="7"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="3.4"' \
+    "v3.4 versionName must be 3.4"
+  require_text "$STABILITY_DOC" '## V3.4 Settings Update Flow' \
+    "v3.4 version bump requires an explicit settings update release note"
+  require_text "$STABILITY_DOC" 'V3.4 signing rule' \
+    "v3.4 must preserve the stable release signing line"
+  require_text "$STABILITY_DOC" 'V3.4 settings preservation rule' \
+    "v3.4 must document preservation of installed settings"
+  require_text "$STABILITY_DOC" 'V3.4 hosted install rule' \
+    "v3.4 must document the hosted installation procedure"
+  require_text "$STABILITY_DOC" 'V3.4 rollback rule' \
+    "v3.4 requires documented rollback expectations"
 else
   fail "unsupported Android versionCode; document migration and rollback expectations first"
 fi
