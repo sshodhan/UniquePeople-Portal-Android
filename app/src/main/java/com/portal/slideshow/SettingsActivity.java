@@ -82,7 +82,7 @@ public class SettingsActivity extends Activity {
     private View sidebar() {
         LinearLayout side = column(); side.setPadding(dp(34), dp(34), dp(24), dp(28)); side.setBackgroundColor(SIDE);
         side.addView(txt("UniquePeople", 25, TEXT, true));
-        TextView sub = txt("V3.1 Portal settings", 14, MUTED, false); side.addView(sub, top(5));
+        TextView sub = txt("V3.2 Portal settings", 14, MUTED, false); side.addView(sub, top(5));
         setupNav = nav("Setup"); advancedNav = nav("Advanced");
         side.addView(setupNav, top(54)); side.addView(advancedNav, full());
         setupNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showSetup(); }});
@@ -97,7 +97,7 @@ public class SettingsActivity extends Activity {
 
     private View footer() {
         LinearLayout footer = row(); footer.setGravity(Gravity.CENTER_VERTICAL); footer.setPadding(dp(30), dp(12), dp(30), dp(12)); footer.setBackgroundColor(SIDE);
-        footer.addView(txt("UniquePeople OS v2.4  •  Connected securely", 13, MUTED, false), new LinearLayout.LayoutParams(0, -2, 1));
+        footer.addView(txt("UniquePeople 3.2  •  Connected securely", 13, MUTED, false), new LinearLayout.LayoutParams(0, -2, 1));
         Button refresh = button("Refresh from web", false), cancel = button("Cancel", false), save = button("Save & play", true);
         refresh.setOnClickListener(new View.OnClickListener() { public void onClick(final View v) { refresh(v); }});
         cancel.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { setResult(RESULT_CANCELED); finish(); }});

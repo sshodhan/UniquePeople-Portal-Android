@@ -49,6 +49,8 @@ The release APK is written to `app-release.apk`.
 
 Existing debug-signed V1/V2 installs cannot update directly to release-signed V3. Treat that as a planned one-time migration and preserve a rollback APK before attempting it.
 
+V3.2 (`versionCode 5`) is the manually installed hosted-updater baseline. It checks `https://uniquepeople-web.vercel.app/api/android-update` without blocking normal slideshow startup. A newer APK is offered to Android's installer only after its HTTPS URL, package name, increasing version code, file SHA-256, and release signing certificate all match the hosted manifest and installed app.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).
