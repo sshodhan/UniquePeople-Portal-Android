@@ -57,6 +57,8 @@ V3.4 (`versionCode 7`) adds Settings > Updates with installed build details, man
 
 For a clean install handoff to another computer, use `scripts/install-hosted-apk.sh`. It accepts either a public HTTPS APK URL or a local APK, requires the expected SHA-256, saves the installed APK for rollback, and performs an in-place ADB install. It does not build or sign APKs and does not require the release keystore or signing credentials.
 
+The physical Portal's legacy package installer displayed a blank confirmation activity during the 2026-08-09 V3.4 test, so Preview and Production OTA manifests are disabled. Read [the hosted update test findings](docs/HOSTED_UPDATE_TEST_2026-08-09.md) before re-enabling them or changing the installer path.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).

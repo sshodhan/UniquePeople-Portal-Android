@@ -86,6 +86,8 @@ V3.4 adds an Updates page after Advanced settings. It shows the installed versio
 
 ## Must Not Break
 
+The 2026-08-09 hosted update test reached the Portal firmware package installer but stalled on a blank confirmation activity. OTA is disabled in Preview and Production pending a different installer integration. See [Hosted Android Update Test — 2026-08-09](HOSTED_UPDATE_TEST_2026-08-09.md) before changing or re-enabling the hosted update flow.
+
 1. Preserve package name `com.portal.slideshow`.
    Changing this creates a separate app install and will not preserve customer settings.
 
