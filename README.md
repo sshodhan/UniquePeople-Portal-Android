@@ -55,6 +55,8 @@ V3.3 (`versionCode 6`) is the hosted-update proof release. Its Settings footer i
 
 V3.4 (`versionCode 7`) adds Settings > Updates with installed build details, manual and pull-down checks, and installer resumption after unknown-source permission is granted. It remains on the stable V3 release-signing line and preserves existing Portal settings during an in-place hosted update.
 
+For a clean install handoff to another computer, use `scripts/install-hosted-apk.sh`. It accepts either a public HTTPS APK URL or a local APK, requires the expected SHA-256, saves the installed APK for rollback, and performs an in-place ADB install. It does not build or sign APKs and does not require the release keystore or signing credentials.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).
