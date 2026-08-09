@@ -55,6 +55,8 @@ V3.3 (`versionCode 6`) is the hosted-update proof release. Its Settings footer i
 
 V3.4 (`versionCode 7`) adds Settings > Updates with installed build details, manual and pull-down checks, and installer resumption after unknown-source permission is granted. It remains on the stable V3 release-signing line and preserves existing Portal settings during an in-place hosted update.
 
+The physical Portal's legacy package installer displayed a blank confirmation activity during the 2026-08-09 V3.4 test, so Preview and Production OTA manifests are disabled. Read [the hosted update test findings](docs/HOSTED_UPDATE_TEST_2026-08-09.md) before re-enabling them or changing the installer path.
+
 ## Production v1 stability
 
 UniquePeople v1 is installed on a customer Portal. Before changing Android behavior, web config behavior, or rollout process, read [docs/V1_STABILITY.md](docs/V1_STABILITY.md).
