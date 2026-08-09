@@ -72,6 +72,18 @@ V3.3 is the first release intended to prove the complete hosted update path from
 - V3.3 verification rule: confirm the hosted file SHA-256 and certificate SHA-256 match the locally verified release artifact before enabling the manifest.
 - V3.3 rollback rule: preserve the installed V3.2 APK before the hosted update. If rollback is required and Android blocks the version downgrade, stop before uninstalling or clearing data.
 
+## V3.4 Settings Update Flow
+
+V3.4 adds an Updates page after Advanced settings. It shows the installed version and version code, supports button and pull-down checks against the hosted update channel, and resumes the Android installer after the user grants permission to install from this source. Update checks remain optional and must not interrupt the slideshow or alter existing settings.
+
+- V3.4 Android versionCode: `7`
+- V3.4 Android versionName: `3.4`
+- V3.4 signing rule: build and distribute with the same stable V3 release certificate used by V3.2 and V3.3; do not rotate the keystore.
+- V3.4 settings preservation rule: keep package `com.portal.slideshow`, SharedPreferences file `slideshow_prefs`, and all existing preference keys unchanged so the hosted in-place install retains device configuration.
+- V3.4 hosted install rule: publish an immutable release-signed APK only after verifying its package, increasing version code, file SHA-256, and certificate SHA-256; then point the optional hosted manifest to that exact artifact.
+- V3.4 verification rule: test Settings > Updates and the Android installer handoff on an emulator before rollout, then confirm the installed version and preserved settings on the physical Portal.
+- V3.4 rollback rule: preserve the installed V3.2 APK before the hosted update. If rollback is required and Android blocks the version downgrade, stop before uninstalling or clearing app data and explain the non-destructive options.
+
 ## Must Not Break
 
 1. Preserve package name `com.portal.slideshow`.
