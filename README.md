@@ -55,6 +55,8 @@ V3.3 (`versionCode 6`) is the hosted-update proof release. Its Settings footer i
 
 V3.4 (`versionCode 7`) adds Settings > Updates with installed build details, manual and pull-down checks, and installer resumption after unknown-source permission is granted. It remains on the stable V3 release-signing line and preserves existing Portal settings during an in-place hosted update.
 
+For a clean install handoff to another computer, use `scripts/install-hosted-apk.sh`. It accepts either a public HTTPS APK URL or a local APK, requires the expected SHA-256, saves the installed APK for rollback, and performs an in-place ADB install. It does not build or sign APKs and does not require the release keystore or signing credentials.
+
 The physical Portal's legacy package installer displayed a blank confirmation activity during the 2026-08-09 V3.4 test, so Preview and Production OTA manifests are disabled. Read [the hosted update test findings](docs/HOSTED_UPDATE_TEST_2026-08-09.md) before re-enabling them or changing the installer path.
 
 ## Production v1 stability
