@@ -49,6 +49,18 @@ V3.1 is an in-place update on the V3 release-signed distribution line. It preser
 - V3.1 install rule: preserve the currently installed APK first, verify certificate continuity, then install with `adb install -r app-release.apk` so app data remains intact.
 - V3.1 rollback rule: reinstall the preserved release-signed APK. If Android blocks the version downgrade, stop and explain the non-destructive options before uninstalling or clearing data.
 
+## V3.2 Hosted Updater Baseline
+
+V3.2 is the manually installed baseline that can discover, download, verify, and hand future release-signed APKs to Android's package installer. Update checks remain optional and must never prevent the slideshow from starting or continuing offline.
+
+- V3.2 Android versionCode: `5`
+- V3.2 Android versionName: `3.2`
+- V3.2 signing rule: build and distribute with the same stable V3 release certificate. A downloaded APK must match both the certificate declared by the hosted manifest and the certificate of the installed app.
+- V3.2 install rule: preserve the currently installed release APK, verify certificate continuity, then manually install V3.2 with `adb install -r app-release.apk`. V3.2 cannot host-update an older build that does not yet contain the updater.
+- V3.2 verification rule: require HTTPS metadata and APK URLs, an increasing version code, the established package name, matching file SHA-256, and matching release certificate SHA-256 before opening Android's installer.
+- V3.2 offline rule: metadata or download failure must not interrupt photos, tiles, settings, or the assistant. The user may dismiss optional update prompts.
+- V3.2 rollback rule: reinstall the preserved V3.1 release-signed APK. If Android blocks the version downgrade, stop and explain non-destructive options before uninstalling or clearing data.
+
 ## Must Not Break
 
 1. Preserve package name `com.portal.slideshow`.

@@ -317,6 +317,7 @@ public class MainActivity extends Activity {
                 if (success) loadAndPlay();
             }
         });
+        AndroidUpdateManager.checkOnLaunch(this);
     }
 
     @Override
@@ -813,6 +814,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (AndroidUpdateManager.handleActivityResult(this, requestCode)) return;
         if (requestCode == REQ_SETTINGS && resultCode == RESULT_OK) {
             hideStatus();
             video.stopPlayback();

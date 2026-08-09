@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT/app/src/main/AndroidManifest.xml"
 MAIN="$ROOT/app/src/main/java/com/portal/slideshow/MainActivity.java"
+UPDATER="$ROOT/app/src/main/java/com/portal/slideshow/AndroidUpdateManager.java"
 STRINGS="$ROOT/app/src/main/res/values/strings.xml"
 STABILITY_DOC="$ROOT/docs/V1_STABILITY.md"
 
@@ -68,6 +69,15 @@ elif grep -Fq 'android:versionCode="4"' "$MANIFEST"; then
     "v3.1 requires documented rollback expectations"
   require_text "$STABILITY_DOC" 'same stable V3 release certificate' \
     "v3.1 must preserve the V3 signing line"
+elif grep -Fq 'android:versionCode="5"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="3.2"' \
+    "v3.2 versionName must be 3.2"
+  require_text "$STABILITY_DOC" '## V3.2 Hosted Updater Baseline' \
+    "v3.2 version bump requires an explicit updater release note"
+  require_text "$STABILITY_DOC" 'V3.2 signing rule' \
+    "v3.2 must preserve the stable release signing line"
+  require_text "$STABILITY_DOC" 'V3.2 rollback rule' \
+    "v3.2 requires documented rollback expectations"
 else
   fail "unsupported Android versionCode; document migration and rollback expectations first"
 fi
@@ -95,6 +105,24 @@ require_text "$MAIN" 'static final int MODE_GOOGLE_PHOTOS = 3;' \
   "Google Photos mode value changed; stored v1 mode may break"
 require_text "$MAIN" 'static final int MODE_PHOTO_HOST = 4;' \
   "Photo Host mode value changed; stored v1 mode may break"
+require_file "$UPDATER"
+require_file "$ROOT/app/src/main/java/com/portal/slideshow/UpdateFileProvider.java"
+require_text "$MANIFEST" 'android.permission.REQUEST_INSTALL_PACKAGES' \
+  "hosted updater baseline must declare package-install request permission"
+require_text "$UPDATER" '"https://uniquepeople-web.vercel.app/api/android-update"' \
+  "updater must use the production HTTPS manifest endpoint"
+require_text "$UPDATER" 'manifest.versionCode <= currentVersionCode(activity)' \
+  "updater must ignore equal or older releases"
+require_text "$UPDATER" 'sha256(apk).equals(manifest.sha256)' \
+  "updater must verify the complete APK checksum"
+require_text "$UPDATER" '!PACKAGE_NAME.equals(archive.packageName)' \
+  "updater must verify the downloaded package name"
+require_text "$UPDATER" '!archiveCertificate.equals(manifest.certificateSha256)' \
+  "updater must verify the manifest release certificate"
+require_text "$UPDATER" '!archiveCertificate.equals(installedCertificate)' \
+  "updater must verify certificate continuity with the installed app"
+require_text "$UPDATER" 'connection.setInstanceFollowRedirects(false);' \
+  "updater must not follow an unvalidated redirect"
 
 require_text "$MAIN" 'return p.getString(KEY_ALBUM_URL, DEFAULT_ALBUM_URL);' \
   "album URL getter no longer preserves configured remote/local album value"
