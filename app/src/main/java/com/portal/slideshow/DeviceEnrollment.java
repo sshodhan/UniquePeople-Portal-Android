@@ -94,7 +94,7 @@ final class DeviceEnrollment {
                         clearPendingEnrollment(context);
                         stage = "begin";
                         JSONObject begin = request(endpoint, "POST", new JSONObject()
-                                .put("action", "begin")
+                                .put("action", "attest-begin")
                                 .put("deviceId", deviceId));
                         challenge = begin.optString("challenge", "");
                         challengeToken = begin.optString("challengeToken", "");
@@ -111,7 +111,7 @@ final class DeviceEnrollment {
                     signer.initSign(identityPrivateKey());
                     signer.update(challengeToken.getBytes(StandardCharsets.UTF_8));
                     JSONObject complete = request(endpoint, "POST", new JSONObject()
-                            .put("action", "complete")
+                            .put("action", "attest-complete")
                             .put("deviceId", deviceId)
                             .put("challenge", challenge)
                             .put("challengeToken", challengeToken)
