@@ -9,8 +9,11 @@
 - [ ] Feature branch is rebased onto the latest `main`. Resolve conflicts with
       full awareness of surrounding changes — never mechanically.
 - [ ] `scripts/check-v1-compatibility.sh` passes.
-- [ ] `./build.sh` still builds where an Android SDK is available; if the
-      change touches Java sources, at minimum confirm they compile.
+- [ ] The build guard passes: CI's `Build` workflow runs the real
+      `INCLUDE_VIDEO=0 bash build.sh` on every PR and must be green. Run
+      `./build.sh` locally too when an Android SDK is available; if the
+      change touches Java sources, never rely on review alone to prove they
+      compile.
 
 ## 2. Risky-surface checks
 

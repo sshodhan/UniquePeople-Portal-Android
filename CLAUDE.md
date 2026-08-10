@@ -29,6 +29,8 @@ that spawned them.
 
 - `./build.sh` builds the APK self-contained: no Gradle, no network, only the
   local Android SDK + a JDK. Keep it that way (`LEARNINGS.md` §3).
+- The `Build` CI workflow runs `INCLUDE_VIDEO=0 bash build.sh` on every PR —
+  every change must produce an installable APK, not just pass review.
 - `scripts/check-v1-compatibility.sh` runs the V1 stability guardrails and
   must pass before any push (CI runs it on every PR).
 - `scripts/check-learnings-format.sh` guards `LEARNINGS.md` numbering.
