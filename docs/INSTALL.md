@@ -1,4 +1,4 @@
-# Install UniquePeople on Meta Portal
+# Get UniquePeople running on your Meta Portal
 
 UniquePeople displays a shared Google Photos or Google Drive link on a Meta Portal and can be installed from a macOS or Linux computer using Android Debug Bridge (ADB).
 

@@ -36,7 +36,7 @@ The debug APK is written to `app-debug.apk`.
 
 ## Install on a Portal
 
-Follow the [Portal installation guide](docs/INSTALL.md) for the developer-mode prerequisite and a copy-and-paste installer that downloads and verifies the release-signed APK.
+Follow [Get UniquePeople running on your Meta Portal](docs/INSTALL.md) for the developer-mode prerequisite and a copy-and-paste installer that downloads and verifies the release-signed APK.
 
 ## Release-signed builds
 
