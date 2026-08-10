@@ -60,5 +60,12 @@
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
+
+        <!-- Investigation-only probe for AUR-53. It does not alter enrollment state. -->
+        <activity
+            android:name=".AttestationProbeActivity"
+            android:exported="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Material" />
     </application>
 </manifest>
