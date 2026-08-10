@@ -161,9 +161,14 @@ require_text "$ENROLLMENT" '"enrollment_failed"' \
   "enrollment failures must remain observable"
 require_text "$ENROLLMENT" '"marin_toggle_failed"' \
   "Marin setting failures must remain observable"
+require_text "$ENROLLMENT" '"X-HTTP-Method-Override", "PATCH"' \
+  "Android Marin toggles must use the HttpURLConnection-compatible PATCH override"
 require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
   '"assistant_page_failed"' \
   "Assistant WebView failures must remain observable"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
+  '"assistant_memoryless_fallback"' \
+  "Marin must remain available when memory enrollment fails"
 require_file "$ROOT/app/src/main/java/com/portal/slideshow/UpdateFileProvider.java"
 require_text "$MANIFEST" 'android.permission.REQUEST_INSTALL_PACKAGES' \
   "hosted updater baseline must declare package-install request permission"

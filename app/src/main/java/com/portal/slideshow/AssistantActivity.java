@@ -173,30 +173,46 @@ public class AssistantActivity extends Activity {
         status.setText("Setting up Marin...");
         status.setVisibility(View.VISIBLE);
         final String deviceId = assistantDeviceId;
+        if (Uri.parse(pendingAssistantUrl).getQueryParameter("memoryKey") != null) {
+            PortalLogger.event(this, pendingAssistantUrl, deviceId,
+                    "manual_credential_used", "launch", 0);
+            loadAssistantPage(deviceId, "");
+            return;
+        }
         DeviceEnrollment.ensureEnrolled(this, deviceId, pendingAssistantUrl, new DeviceEnrollment.Callback() {
             public void onComplete(final String memoryKey, final Exception error) {
                 runOnUiThread(new Runnable() {
                     public void run() {
                         if (error != null) {
-                            status.setText("Marin setup could not finish. Close and try again.");
+                            PortalLogger.event(AssistantActivity.this, pendingAssistantUrl, deviceId,
+                                    "assistant_memoryless_fallback", "enrollment", elapsed());
+                            status.setText(error instanceof DeviceEnrollment.HttpStatusException
+                                    && ((DeviceEnrollment.HttpStatusException) error).statusCode == 409
+                                    ? "Marin memory needs an administrator reset. Opening without memory..."
+                                    : "Marin memory is unavailable. Opening without memory...");
                             status.setVisibility(View.VISIBLE);
+                            loadAssistantPage(deviceId, "");
                             return;
                         }
-                        Uri.Builder builder = Uri.parse(pendingAssistantUrl).buildUpon();
-                        Uri current = Uri.parse(pendingAssistantUrl);
-                        if (current.getQueryParameter("deviceId") == null) {
-                            builder.appendQueryParameter("deviceId", deviceId);
-                        }
-                        if (current.getQueryParameter("memoryKey") == null) {
-                            builder.appendQueryParameter("memoryKey", memoryKey);
-                        }
-                        status.setText("Loading Marin...");
-                        mainFrameFailed = false;
-                        webView.loadUrl(builder.build().toString());
+                        loadAssistantPage(deviceId, memoryKey);
                     }
                 });
             }
         });
+    }
+
+    private void loadAssistantPage(String deviceId, String memoryKey) {
+        Uri.Builder builder = Uri.parse(pendingAssistantUrl).buildUpon();
+        Uri current = Uri.parse(pendingAssistantUrl);
+        if (current.getQueryParameter("deviceId") == null) {
+            builder.appendQueryParameter("deviceId", deviceId);
+        }
+        if (current.getQueryParameter("memoryKey") == null && !TextUtils.isEmpty(memoryKey)) {
+            builder.appendQueryParameter("memoryKey", memoryKey);
+        }
+        if (!TextUtils.isEmpty(memoryKey)) status.setText("Loading Marin...");
+        mainFrameFailed = false;
+        webView.loadUrl(builder.build().toString());
     }
 
     private long elapsed() {

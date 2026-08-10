@@ -25,6 +25,13 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.GCMParameterSpec;
 
 final class DeviceEnrollment {
+    static final class HttpStatusException extends Exception {
+        final int statusCode;
+        HttpStatusException(String method, int statusCode) {
+            super(method + " request failed (HTTP " + statusCode + ").");
+            this.statusCode = statusCode;
+        }
+    }
     interface Callback {
         void onComplete(String memoryKey, Exception error);
     }
@@ -209,7 +216,9 @@ final class DeviceEnrollment {
         HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
         connection.setConnectTimeout(10_000);
         connection.setReadTimeout(10_000);
-        connection.setRequestMethod(method);
+        boolean patchOverride = "PATCH".equals(method);
+        connection.setRequestMethod(patchOverride ? "POST" : method);
+        if (patchOverride) connection.setRequestProperty("X-HTTP-Method-Override", "PATCH");
         connection.setRequestProperty("Content-Type", "application/json");
         connection.setDoOutput(true);
         try (OutputStream output = connection.getOutputStream()) {
@@ -221,7 +230,7 @@ final class DeviceEnrollment {
                 StandardCharsets.UTF_8));
         StringBuilder response = new StringBuilder();
         for (String line; (line = reader.readLine()) != null;) response.append(line);
-        if (code >= 400) throw new IllegalStateException(method + " request failed (HTTP " + code + ").");
+        if (code >= 400) throw new HttpStatusException(method, code);
         return new JSONObject(response.toString());
     }
 }

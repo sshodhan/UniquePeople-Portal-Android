@@ -291,7 +291,12 @@ public class SettingsActivity extends Activity {
                     if (error == null) showAssistant();
                     else {
                         assistantStatus.setText("●  Setup needs attention"); assistantStatus.setTextColor(Color.rgb(255, 145, 125));
-                        assistantDetails.setText("Marin could not connect. Check this Portal's internet connection and try again.");
+                        if (error instanceof DeviceEnrollment.HttpStatusException
+                                && ((DeviceEnrollment.HttpStatusException) error).statusCode == 409) {
+                            assistantDetails.setText("This Portal ID belongs to a previous installation. An administrator must reset its enrollment before memory can reconnect.");
+                        } else {
+                            assistantDetails.setText("Marin memory could not connect. Check this Portal's internet connection and try again. Marin can still open without memory.");
+                        }
                     }
                 }});
             }
