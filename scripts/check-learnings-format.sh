@@ -30,7 +30,8 @@ takeaways="$(sed -n '/^## Key takeaways$/,$p' "$DOC")"
 [[ -n "$takeaways" ]] || fail "expected a '## Key takeaways' section"
 
 for n in $numbers; do
-  printf '%s' "$takeaways" | grep -q "§$n" || fail "lesson §$n is missing from Key takeaways"
+  # Boundary after the number: without it, §1 would be satisfied by §10.
+  printf '%s\n' "$takeaways" | grep -qE "§${n}([^0-9]|\$)" || fail "lesson §$n is missing from Key takeaways"
 done
 
 echo "LEARNINGS.md format check passed."
