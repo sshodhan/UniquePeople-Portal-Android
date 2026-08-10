@@ -3,9 +3,8 @@
 # This script never loads a keystore or builds/signs an APK.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PACKAGE_NAME="com.portal.slideshow"
-ROLLBACK_ROOT="$ROOT/rollback-apks/handoff"
+ROLLBACK_ROOT="$PWD/rollback-apks/handoff"
 SERIAL=""
 APK_PATH=""
 APK_URL=""
@@ -23,7 +22,7 @@ Options:
   --apk APK_PATH        Install an already-downloaded APK.
   --sha256 SHA256       Required expected SHA-256 for the APK.
   -s, --serial SERIAL   Target ADB device. Auto-detects one physical device if omitted.
-  --rollback-root DIR   Rollback output directory (default: repository/rollback-apks/handoff).
+  --rollback-root DIR   Rollback output directory (default: current-directory/rollback-apks/handoff).
   --package NAME        Expected installed package (default: com.portal.slideshow).
   -h, --help            Show this help.
 

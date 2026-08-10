@@ -34,6 +34,10 @@ The original video modes are still available:
 
 The debug APK is written to `app-debug.apk`.
 
+## Install on a Portal
+
+Follow [Slideshow and AI Voice Agent for Daily Updates](docs/INSTALL.md) for the developer-mode prerequisite and a copy-and-paste installer that downloads and verifies the release-signed APK.
+
 ## Release-signed builds
 
 V3 starts the release-signed distribution line for family installs and future hosted APK updates. Create and preserve the release keystore using [docs/RELEASE_SIGNING.md](docs/RELEASE_SIGNING.md), then build:
