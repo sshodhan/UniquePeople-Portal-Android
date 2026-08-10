@@ -105,6 +105,19 @@ elif grep -Fq 'android:versionCode="7"' "$MANIFEST"; then
     "v3.4 must document the hosted installation procedure"
   require_text "$STABILITY_DOC" 'V3.4 rollback rule' \
     "v3.4 requires documented rollback expectations"
+elif grep -Fq 'android:versionCode="8"' "$MANIFEST"; then
+  require_text "$MANIFEST" 'android:versionName="3.5"' \
+    "v3.5 versionName must be 3.5"
+  require_text "$STABILITY_DOC" '## V3.5 Attested Marin Enrollment' \
+    "v3.5 version bump requires an explicit enrollment release note"
+  require_text "$STABILITY_DOC" 'V3.5 signing rule' \
+    "v3.5 must preserve the stable release signing line"
+  require_text "$STABILITY_DOC" 'V3.5 settings preservation rule' \
+    "v3.5 must document preservation of installed settings"
+  require_text "$STABILITY_DOC" 'V3.5 deployment rule' \
+    "v3.5 must document coordinated web-first deployment"
+  require_text "$STABILITY_DOC" 'V3.5 rollback rule' \
+    "v3.5 requires documented rollback expectations"
 else
   fail "unsupported Android versionCode; document migration and rollback expectations first"
 fi
@@ -147,6 +160,10 @@ require_text "$ENROLLMENT" '.setAttestationChallenge(Base64.decode(challenge, Ba
   "Portal enrollment must bind the server challenge into the identity key"
 require_text "$ENROLLMENT" 'signer.update(challengeToken.getBytes(StandardCharsets.UTF_8))' \
   "Portal enrollment must prove possession of the attested private key"
+require_text "$ENROLLMENT" 'if (!beginEnrollment(callback)) return;' \
+  "Portal enrollment must remain single-flight across concurrent launch and retry actions"
+require_text "$ENROLLMENT" 'pendingChallengeExpired(context)' \
+  "Portal enrollment must discard expired pending transactions before retrying"
 require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
   'appendQueryParameter("memoryKey", memoryKey)' \
   "Marin must receive the enrolled device memory credential"

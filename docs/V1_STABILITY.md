@@ -84,6 +84,20 @@ V3.4 adds an Updates page after Advanced settings. It shows the installed versio
 - V3.4 verification rule: test Settings > Updates and the Android installer handoff on an emulator before rollout, then confirm the installed version and preserved settings on the physical Portal.
 - V3.4 rollback rule: preserve the installed V3.2 APK before the hosted update. If rollback is required and Android blocks the version downgrade, stop before uninstalling or clearing app data and explain the non-destructive options.
 
+## V3.5 Attested Marin Enrollment
+
+V3.5 replaces the failed shared-token first-run path with the versioned
+`attest-begin` / `attest-complete` contract. It preserves all existing Portal
+settings and opens Marin honestly without memory if enrollment cannot finish.
+
+- V3.5 Android versionCode: `8`
+- V3.5 Android versionName: `3.5`
+- V3.5 signing rule: use the same stable V3 release certificate; its digest is part of the server attestation allowlist.
+- V3.5 settings preservation rule: keep package `com.portal.slideshow`, SharedPreferences file `slideshow_prefs`, the existing Portal ID, and all established preference keys.
+- V3.5 deployment rule: deploy and verify the companion web attestation contract before distributing the APK.
+- V3.5 verification rule: complete first enrollment, memory save, credential reuse, and second-session memory retrieval on the physical Portal.
+- V3.5 rollback rule: do not uninstall or clear app data; use the prior signed APK only through an Android-supported non-destructive rollback path.
+
 ## Must Not Break
 
 The 2026-08-09 hosted update test reached the Portal firmware package installer but stalled on a blank confirmation activity. OTA is disabled in Preview and Production pending a different installer integration. See [Hosted Android Update Test — 2026-08-09](HOSTED_UPDATE_TEST_2026-08-09.md) before changing or re-enabling the hosted update flow.

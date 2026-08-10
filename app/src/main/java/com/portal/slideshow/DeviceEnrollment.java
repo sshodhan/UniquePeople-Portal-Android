@@ -19,6 +19,8 @@ import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
+import java.util.ArrayList;
+import java.util.List;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -47,6 +49,9 @@ final class DeviceEnrollment {
     private static final String MEMORY_IV_PREF = "assistant_memory_credential_iv";
     private static final String PENDING_CHALLENGE_PREF = "assistant_enrollment_challenge_v2";
     private static final String PENDING_CHALLENGE_TOKEN_PREF = "assistant_enrollment_challenge_token_v2";
+    private static final String PENDING_CHALLENGE_EXPIRES_PREF = "assistant_enrollment_challenge_expires_v2";
+    private static final List<Callback> ENROLLMENT_CALLBACKS = new ArrayList<Callback>();
+    private static boolean enrollmentInFlight;
     private static final String DEFAULT_ENROLLMENT_URL =
             "https://uniquepeople-web.vercel.app/api/device-enroll";
 
@@ -79,6 +84,7 @@ final class DeviceEnrollment {
             callback.onComplete(existing, null);
             return;
         }
+        if (!beginEnrollment(callback)) return;
 
         new Thread(new Runnable() {
             public void run() {
@@ -90,7 +96,8 @@ final class DeviceEnrollment {
                     String endpoint = enrollmentUrl(assistantUrl);
                     String challenge = pendingChallenge(context);
                     String challengeToken = pendingChallengeToken(context);
-                    if (challenge.isEmpty() || challengeToken.isEmpty() || !hasIdentityKey()) {
+                    if (challenge.isEmpty() || challengeToken.isEmpty()
+                            || pendingChallengeExpired(context) || !hasIdentityKey()) {
                         clearPendingEnrollment(context);
                         stage = "begin";
                         JSONObject begin = request(endpoint, "POST", new JSONObject()
@@ -101,7 +108,9 @@ final class DeviceEnrollment {
                         if (challenge.isEmpty() || challengeToken.isEmpty()) {
                             throw new IllegalStateException("Enrollment returned no challenge.");
                         }
-                        savePendingChallenge(context, challenge, challengeToken);
+                        long expiresInSeconds = begin.optLong("expiresInSeconds", 300L);
+                        savePendingChallenge(context, challenge, challengeToken,
+                                System.currentTimeMillis() + Math.max(1L, expiresInSeconds) * 1000L);
                         stage = "attest";
                         generateAttestedKeyPair(challenge);
                     }
@@ -125,7 +134,7 @@ final class DeviceEnrollment {
                     clearPendingChallenge(context);
                     PortalLogger.event(context, assistantUrl, deviceId, "enrollment_succeeded",
                             "credential_saved", System.currentTimeMillis() - startedAt);
-                    callback.onComplete(memoryKey, null);
+                    finishEnrollment(memoryKey, null);
                 } catch (Exception error) {
                     if ("complete".equals(stage) && error instanceof HttpStatusException
                             && ((HttpStatusException) error).statusCode == 401) {
@@ -141,7 +150,7 @@ final class DeviceEnrollment {
                     }
                     PortalLogger.error(context, assistantUrl, deviceId, "enrollment_failed",
                             stage, System.currentTimeMillis() - startedAt, error);
-                    callback.onComplete("", error);
+                    finishEnrollment("", error);
                 }
             }
         }).start();
@@ -241,16 +250,42 @@ final class DeviceEnrollment {
                 .getString(PENDING_CHALLENGE_TOKEN_PREF, "").trim();
     }
 
-    private static void savePendingChallenge(Context context, String challenge, String challengeToken) {
+    private static boolean pendingChallengeExpired(Context context) {
+        long expiresAt = context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                .getLong(PENDING_CHALLENGE_EXPIRES_PREF, 0L);
+        return expiresAt <= System.currentTimeMillis();
+    }
+
+    private static void savePendingChallenge(Context context, String challenge,
+                                             String challengeToken, long expiresAt) {
         context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit()
                 .putString(PENDING_CHALLENGE_PREF, challenge)
-                .putString(PENDING_CHALLENGE_TOKEN_PREF, challengeToken).commit();
+                .putString(PENDING_CHALLENGE_TOKEN_PREF, challengeToken)
+                .putLong(PENDING_CHALLENGE_EXPIRES_PREF, expiresAt).commit();
     }
 
     private static void clearPendingChallenge(Context context) {
         context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit()
                 .remove(PENDING_CHALLENGE_PREF)
-                .remove(PENDING_CHALLENGE_TOKEN_PREF).apply();
+                .remove(PENDING_CHALLENGE_TOKEN_PREF)
+                .remove(PENDING_CHALLENGE_EXPIRES_PREF).apply();
+    }
+
+    private static synchronized boolean beginEnrollment(Callback callback) {
+        ENROLLMENT_CALLBACKS.add(callback);
+        if (enrollmentInFlight) return false;
+        enrollmentInFlight = true;
+        return true;
+    }
+
+    private static void finishEnrollment(String memoryKey, Exception error) {
+        List<Callback> callbacks;
+        synchronized (DeviceEnrollment.class) {
+            callbacks = new ArrayList<Callback>(ENROLLMENT_CALLBACKS);
+            ENROLLMENT_CALLBACKS.clear();
+            enrollmentInFlight = false;
+        }
+        for (Callback callback : callbacks) callback.onComplete(memoryKey, error);
     }
 
     private static void clearPendingEnrollment(Context context) throws Exception {
