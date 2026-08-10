@@ -1,0 +1,35 @@
+name: Hosted Release Consistency
+
+# Guards the public install guide against drift: the pinned APK URL in
+# docs/INSTALL.md must be reachable and its content must match the pinned
+# SHA-256 (docs/RELEASE_CHECKLIST.md step 9). Runs on changes to the guide or
+# installer, weekly (to catch the hosted file changing or vanishing out from
+# under an unchanged guide), and on demand.
+on:
+  pull_request:
+    paths:
+      - "docs/INSTALL.md"
+      - "scripts/install-hosted-apk.sh"
+      - "scripts/check-hosted-release.sh"
+      - ".github/workflows/hosted-release-consistency.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/INSTALL.md"
+      - "scripts/install-hosted-apk.sh"
+      - "scripts/check-hosted-release.sh"
+      - ".github/workflows/hosted-release-consistency.yml"
+  schedule:
+    - cron: "17 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  hosted-release-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify install guide matches hosted APK
+        run: scripts/check-hosted-release.sh

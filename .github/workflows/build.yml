@@ -1,0 +1,39 @@
+name: Build
+
+# Build guard: proves every change still produces an installable APK by
+# running the real self-contained build (no Gradle, no build-time network —
+# see build.sh). Complements V1 Compatibility, which checks sources and docs
+# but never compiles them. INCLUDE_VIDEO=0 builds the shareable variant so
+# CI never depends on personal media assets.
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The runner ships with the Android SDK preinstalled; this step only
+      # tops up a platform or build-tools if an image ever lacks them.
+      # Installing SDK components is CI setup — build.sh itself stays offline.
+      - name: Ensure Android SDK components
+        run: |
+          test -n "$ANDROID_HOME" || { echo "ANDROID_HOME not set on runner"; exit 1; }
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if ! ls "$ANDROID_HOME"/platforms/android-*/android.jar >/dev/null 2>&1; then
+            yes | "$SDKMANAGER" --install "platforms;android-34" >/dev/null
+          fi
+          if ! ls -d "$ANDROID_HOME"/build-tools/* >/dev/null 2>&1; then
+            yes | "$SDKMANAGER" --install "build-tools;34.0.0" >/dev/null
+          fi
+
+      - name: Build APK (self-contained, shareable variant)
+        run: INCLUDE_VIDEO=0 bash build.sh
+
+      - name: Confirm APK output
+        run: ls -la app-debug.apk
