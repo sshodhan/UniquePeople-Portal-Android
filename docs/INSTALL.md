@@ -1,4 +1,4 @@
-# Get UniquePeople running on your Meta Portal
+# Slideshow and AI Voice Agent for Daily Updates
 
 UniquePeople displays a shared Google Photos or Google Drive link on a Meta Portal and can be installed from a macOS or Linux computer using Android Debug Bridge (ADB).
 
