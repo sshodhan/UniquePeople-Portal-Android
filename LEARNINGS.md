@@ -96,6 +96,46 @@ convenience.
 
 ---
 
+## §4. A cross-repo contract exists only when an executable test sends the real request
+
+**Origin:** AUR-53 (production Marin enrollment regression), 2026-08.
+
+**Incident:** this app's merged enrollment client and the web repo's merged
+enrollment handler both passed their own checks, yet no production Portal
+could enroll: the server's `begin` action required an
+`x-device-enrollment-token` header this app has no code path to send, so the
+first tap answered 503 (variable unset) and would have answered 401 with it
+set. Marin opened voice-only while memory provisioning silently failed. The
+replacement contract is attested enrollment (`attest-begin` /
+`attest-complete`): the Keystore identity key is generated with the server
+challenge baked in (SHA-256 of the challenge string — Keystore caps
+attestation challenges at 128 bytes) and the certificate chain is the proof,
+so no shared secret exists on either side.
+
+**Pattern:** when this app and the web repo implement one protocol, each
+side's own tests prove nothing about the contract:
+
+- The web repo keeps a contract test that replays this app's exact request
+  shapes against its real handler (`test/attested-enrollment.test.js` there);
+  any change to what `DeviceEnrollment.java` sends must update that test in
+  the same coordinated migration (§1).
+- A server-side requirement this client cannot satisfy (a header, credential,
+  or config the release APK has no source for) is a contract bug to raise,
+  not a client gap to work around.
+- Server 503s with `retryable: true` are transient storage/config faults —
+  the memoryless fallback plus Settings Retry handles them; 401/409 are
+  trust decisions and retrying without new evidence will not change them.
+
+**Sibling risk:** every endpoint this app consumes (`device-config`,
+`android-update`, realtime negotiation via the WebView) whenever either side
+adds a requirement.
+
+**Guards:** web repo `test/attested-enrollment.test.js` and its review
+checklist §2e; `assistant_memoryless_fallback` guard in
+`scripts/check-v1-compatibility.sh`.
+
+---
+
 ## Key takeaways
 
 - §1 — Consume the web contract defensively: new fields may be absent, legacy
@@ -105,3 +145,6 @@ convenience.
   neutral software gain.
 - §3 — `build.sh` stays offline and Gradle-free; dependencies are vendored
   deliberately or not added.
+- §4 — A cross-repo contract is only real when an executable test replays this
+  app's actual request against the real web handler; a server requirement the
+  release APK cannot satisfy is a contract bug, not a client gap.

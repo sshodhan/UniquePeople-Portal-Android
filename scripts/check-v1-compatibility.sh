@@ -141,8 +141,10 @@ require_text "$ENROLLMENT" 'KeyStore.getInstance("AndroidKeyStore")' \
   "Portal enrollment identity must remain in Android Keystore"
 require_text "$ENROLLMENT" '.put("deviceId", deviceId)' \
   "Portal enrollment must bind the existing Settings device ID"
-require_text "$ENROLLMENT" '.put("action", "complete")' \
+require_text "$ENROLLMENT" '.put("action", "attest-complete")' \
   "Portal enrollment must prove possession before receiving memory access"
+require_text "$ENROLLMENT" '.setAttestationChallenge(challengeBytes)' \
+  "Portal enrollment must bind the server challenge into the attested identity key"
 require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
   'appendQueryParameter("memoryKey", memoryKey)' \
   "Marin must receive the enrolled device memory credential"

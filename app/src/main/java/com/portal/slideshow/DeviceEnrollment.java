@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -13,11 +14,10 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
-import java.security.PrivateKey;
-import java.security.Signature;
+import java.security.MessageDigest;
+import java.security.cert.Certificate;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -80,32 +80,33 @@ final class DeviceEnrollment {
         new Thread(new Runnable() {
             public void run() {
                 long startedAt = System.currentTimeMillis();
-                String stage = "keystore";
+                String stage = "attest-begin";
                 PortalLogger.event(context, assistantUrl, deviceId, "enrollment_started",
                         "begin", 0);
                 try {
-                    KeyPair pair = getOrCreateKeyPair();
                     String endpoint = enrollmentUrl(assistantUrl);
-                    stage = "begin";
                     JSONObject begin = request(endpoint, "POST", new JSONObject()
-                            .put("action", "begin")
-                            .put("deviceId", deviceId)
-                            .put("publicKey", Base64.encodeToString(
-                                    pair.getPublic().getEncoded(), Base64.NO_WRAP)));
-                    String challenge = begin.getString("challenge");
+                            .put("action", "attest-begin")
+                            .put("deviceId", deviceId));
+                    // Present-but-empty is a real state to handle (LEARNINGS §1).
+                    String challenge = begin.optString("challenge", "").trim();
+                    if (challenge.isEmpty()) throw new IllegalStateException("Enrollment returned no challenge.");
 
-                    stage = "sign";
-                    Signature signer = Signature.getInstance("SHA256withECDSA");
-                    signer.initSign(privateKey());
-                    signer.update(challenge.getBytes(StandardCharsets.UTF_8));
-                    stage = "complete";
+                    stage = "keystore";
+                    Certificate[] chain = createAttestedKeyPair(challenge);
+
+                    stage = "attest-complete";
+                    JSONArray certificates = new JSONArray();
+                    for (Certificate certificate : chain) {
+                        certificates.put(Base64.encodeToString(certificate.getEncoded(), Base64.NO_WRAP));
+                    }
                     JSONObject complete = request(endpoint, "POST", new JSONObject()
-                            .put("action", "complete")
+                            .put("action", "attest-complete")
                             .put("deviceId", deviceId)
                             .put("challenge", challenge)
-                            .put("signature", Base64.encodeToString(signer.sign(), Base64.NO_WRAP)));
+                            .put("certificateChain", certificates));
 
-                    String memoryKey = complete.getString("memoryKey").trim();
+                    String memoryKey = complete.optString("memoryKey", "").trim();
                     if (memoryKey.isEmpty()) throw new IllegalStateException("Enrollment returned no memory key.");
                     stage = "credential_save";
                     saveMemoryKey(context, memoryKey);
@@ -165,25 +166,30 @@ final class DeviceEnrollment {
         }
     }
 
-    private static KeyPair getOrCreateKeyPair() throws Exception {
+    // The server challenge is bound into the identity key at creation time.
+    // Keystore caps attestation challenges at 128 bytes, so both sides use
+    // SHA-256 of the challenge string. This path is only reached with no saved
+    // credential, so regenerating the key is safe; the server accepts an
+    // attested re-bind when a retry follows a lost success response.
+    private static Certificate[] createAttestedKeyPair(String challenge) throws Exception {
+        byte[] challengeBytes = MessageDigest.getInstance("SHA-256")
+                .digest(challenge.getBytes(StandardCharsets.UTF_8));
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
-        if (store.containsAlias(KEY_ALIAS)) {
-            return new KeyPair(store.getCertificate(KEY_ALIAS).getPublicKey(), privateKey());
-        }
+        if (store.containsAlias(KEY_ALIAS)) store.deleteEntry(KEY_ALIAS);
         KeyPairGenerator generator = KeyPairGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
         generator.initialize(new KeyGenParameterSpec.Builder(KEY_ALIAS,
                 KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
                 .setDigests(KeyProperties.DIGEST_SHA256)
+                .setAttestationChallenge(challengeBytes)
                 .build());
-        return generator.generateKeyPair();
-    }
-
-    private static PrivateKey privateKey() throws Exception {
-        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
-        store.load(null);
-        return (PrivateKey) store.getKey(KEY_ALIAS, null);
+        generator.generateKeyPair();
+        Certificate[] chain = store.getCertificateChain(KEY_ALIAS);
+        if (chain == null || chain.length == 0) {
+            throw new IllegalStateException("Android Keystore returned no attestation certificate chain.");
+        }
+        return chain;
     }
 
     private static void saveMemoryKey(Context context, String memoryKey) throws Exception {
