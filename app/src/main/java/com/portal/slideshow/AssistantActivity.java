@@ -15,6 +15,8 @@ import android.view.WindowManager;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceError;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -28,6 +30,10 @@ public class AssistantActivity extends Activity {
     private WebView webView;
     private TextView status;
     private PermissionRequest pendingPermissionRequest;
+    private String pendingAssistantUrl;
+    private long assistantStartedAt;
+    private String assistantDeviceId;
+    private boolean mainFrameFailed;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -100,6 +106,31 @@ public class AssistantActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 status.setVisibility(View.GONE);
+                if (!mainFrameFailed) {
+                    PortalLogger.event(AssistantActivity.this, pendingAssistantUrl, assistantDeviceId,
+                            "assistant_page_loaded", "webview", elapsed());
+                }
+            }
+
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+                if (request.isForMainFrame()) {
+                    mainFrameFailed = true;
+                    PortalLogger.error(AssistantActivity.this, pendingAssistantUrl, assistantDeviceId,
+                            "assistant_page_failed", "webview", elapsed(),
+                            new IllegalStateException("WebView error " + error.getErrorCode()));
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            WebResourceResponse errorResponse) {
+                if (request.isForMainFrame()) {
+                    mainFrameFailed = true;
+                    PortalLogger.error(AssistantActivity.this, pendingAssistantUrl, assistantDeviceId,
+                            "assistant_page_http_failed", "webview", elapsed(),
+                            new IllegalStateException("HTTP " + errorResponse.getStatusCode()));
+                }
             }
         });
 
@@ -122,21 +153,54 @@ public class AssistantActivity extends Activity {
 
     private void loadAssistant() {
         SharedPreferences p = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE);
+        assistantStartedAt = System.currentTimeMillis();
+        assistantDeviceId = MainActivity.getOrCreateDeviceId(this);
+        if (!p.getBoolean(MainActivity.KEY_MARIN_ENABLED, true)) {
+            PortalLogger.event(this, MainActivity.DEFAULT_ASSISTANT_URL, assistantDeviceId,
+                    "assistant_disabled_blocked", "launch", 0);
+            status.setText("Marin is turned off. Enable it in Settings > Assistant.");
+            status.setVisibility(View.VISIBLE);
+            return;
+        }
         String previewUrl = getIntent().getStringExtra("assistant_url");
         String url = TextUtils.isEmpty(previewUrl)
                 ? p.getString(MainActivity.KEY_ASSISTANT_URL, MainActivity.DEFAULT_ASSISTANT_URL).trim()
                 : previewUrl.trim();
         if (url.length() == 0) url = MainActivity.DEFAULT_ASSISTANT_URL;
-        Uri assistantUri = Uri.parse(url);
-        if (assistantUri.getQueryParameter("deviceId") == null) {
-            url = assistantUri.buildUpon()
-                    .appendQueryParameter("deviceId", MainActivity.getOrCreateDeviceId(this))
-                    .build()
-                    .toString();
-        }
-        status.setText("Loading assistant...");
+        pendingAssistantUrl = url;
+        PortalLogger.event(this, pendingAssistantUrl, assistantDeviceId,
+                "assistant_opened", "launch", 0);
+        status.setText("Setting up Marin...");
         status.setVisibility(View.VISIBLE);
-        webView.loadUrl(url);
+        final String deviceId = assistantDeviceId;
+        DeviceEnrollment.ensureEnrolled(this, deviceId, pendingAssistantUrl, new DeviceEnrollment.Callback() {
+            public void onComplete(final String memoryKey, final Exception error) {
+                runOnUiThread(new Runnable() {
+                    public void run() {
+                        if (error != null) {
+                            status.setText("Marin setup could not finish. Close and try again.");
+                            status.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        Uri.Builder builder = Uri.parse(pendingAssistantUrl).buildUpon();
+                        Uri current = Uri.parse(pendingAssistantUrl);
+                        if (current.getQueryParameter("deviceId") == null) {
+                            builder.appendQueryParameter("deviceId", deviceId);
+                        }
+                        if (current.getQueryParameter("memoryKey") == null) {
+                            builder.appendQueryParameter("memoryKey", memoryKey);
+                        }
+                        status.setText("Loading Marin...");
+                        mainFrameFailed = false;
+                        webView.loadUrl(builder.build().toString());
+                    }
+                });
+            }
+        });
+    }
+
+    private long elapsed() {
+        return assistantStartedAt == 0 ? 0 : System.currentTimeMillis() - assistantStartedAt;
     }
 
     private void requestMediaPermissionsIfNeeded() {

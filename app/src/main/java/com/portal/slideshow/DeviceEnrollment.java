@@ -1,0 +1,227 @@
+package com.portal.slideshow;
+
+import android.content.Context;
+import android.security.keystore.KeyGenParameterSpec;
+import android.security.keystore.KeyProperties;
+import android.util.Base64;
+
+import org.json.JSONObject;
+
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyPair;
+import java.security.KeyPairGenerator;
+import java.security.KeyStore;
+import java.security.PrivateKey;
+import java.security.Signature;
+
+import javax.crypto.Cipher;
+import javax.crypto.KeyGenerator;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.GCMParameterSpec;
+
+final class DeviceEnrollment {
+    interface Callback {
+        void onComplete(String memoryKey, Exception error);
+    }
+
+    interface SettingCallback {
+        void onComplete(boolean enabled, Exception error);
+    }
+
+    private static final String KEY_ALIAS = "uniquepeople_portal_identity";
+    private static final String STORAGE_KEY_ALIAS = "uniquepeople_portal_credential_storage";
+    private static final String MEMORY_CIPHER_PREF = "assistant_memory_credential";
+    private static final String MEMORY_IV_PREF = "assistant_memory_credential_iv";
+    private static final String DEFAULT_ENROLLMENT_URL =
+            "https://uniquepeople-web.vercel.app/api/device-enroll";
+
+    static String savedMemoryKey(Context context) {
+        try {
+            android.content.SharedPreferences preferences =
+                    context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE);
+            String encodedCiphertext = preferences.getString(MEMORY_CIPHER_PREF, "");
+            String encodedIv = preferences.getString(MEMORY_IV_PREF, "");
+            if (encodedCiphertext.isEmpty() || encodedIv.isEmpty()) return "";
+            Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, credentialStorageKey(),
+                    new GCMParameterSpec(128, Base64.decode(encodedIv, Base64.NO_WRAP)));
+            return new String(cipher.doFinal(
+                    Base64.decode(encodedCiphertext, Base64.NO_WRAP)), StandardCharsets.UTF_8).trim();
+        } catch (Exception error) {
+            PortalLogger.error(context, MainActivity.DEFAULT_ASSISTANT_URL,
+                    MainActivity.getOrCreateDeviceId(context), "credential_decrypt_failed",
+                    "credential_read", 0, error);
+            return "";
+        }
+    }
+
+    static void ensureEnrolled(final Context context, final String deviceId,
+                               final String assistantUrl, final Callback callback) {
+        final String existing = savedMemoryKey(context);
+        if (!existing.isEmpty()) {
+            PortalLogger.event(context, assistantUrl, deviceId, "credential_reused",
+                    "credential_read", 0);
+            callback.onComplete(existing, null);
+            return;
+        }
+
+        new Thread(new Runnable() {
+            public void run() {
+                long startedAt = System.currentTimeMillis();
+                String stage = "keystore";
+                PortalLogger.event(context, assistantUrl, deviceId, "enrollment_started",
+                        "begin", 0);
+                try {
+                    KeyPair pair = getOrCreateKeyPair();
+                    String endpoint = enrollmentUrl(assistantUrl);
+                    stage = "begin";
+                    JSONObject begin = request(endpoint, "POST", new JSONObject()
+                            .put("action", "begin")
+                            .put("deviceId", deviceId)
+                            .put("publicKey", Base64.encodeToString(
+                                    pair.getPublic().getEncoded(), Base64.NO_WRAP)));
+                    String challenge = begin.getString("challenge");
+
+                    stage = "sign";
+                    Signature signer = Signature.getInstance("SHA256withECDSA");
+                    signer.initSign(privateKey());
+                    signer.update(challenge.getBytes(StandardCharsets.UTF_8));
+                    stage = "complete";
+                    JSONObject complete = request(endpoint, "POST", new JSONObject()
+                            .put("action", "complete")
+                            .put("deviceId", deviceId)
+                            .put("challenge", challenge)
+                            .put("signature", Base64.encodeToString(signer.sign(), Base64.NO_WRAP)));
+
+                    String memoryKey = complete.getString("memoryKey").trim();
+                    if (memoryKey.isEmpty()) throw new IllegalStateException("Enrollment returned no memory key.");
+                    stage = "credential_save";
+                    saveMemoryKey(context, memoryKey);
+                    PortalLogger.event(context, assistantUrl, deviceId, "enrollment_succeeded",
+                            "credential_saved", System.currentTimeMillis() - startedAt);
+                    callback.onComplete(memoryKey, null);
+                } catch (Exception error) {
+                    PortalLogger.error(context, assistantUrl, deviceId, "enrollment_failed",
+                            stage, System.currentTimeMillis() - startedAt, error);
+                    callback.onComplete("", error);
+                }
+            }
+        }).start();
+    }
+
+    static void setMarinEnabled(final Context context, final String deviceId,
+                                final String assistantUrl, final boolean enabled,
+                                final SettingCallback callback) {
+        new Thread(new Runnable() {
+            public void run() {
+                long startedAt = System.currentTimeMillis();
+                PortalLogger.event(context, assistantUrl, deviceId, "marin_toggle_requested",
+                        enabled ? "enable" : "disable", 0);
+                try {
+                    String endpoint = deviceConfigUrl(assistantUrl);
+                    JSONObject response = request(endpoint, "PATCH", new JSONObject()
+                            .put("deviceId", deviceId)
+                            .put("marinEnabled", enabled));
+                    boolean saved = response.getJSONObject("config").optBoolean("marinEnabled", true);
+                    PortalLogger.event(context, assistantUrl, deviceId, "marin_toggle_saved",
+                            saved ? "enabled" : "disabled", System.currentTimeMillis() - startedAt);
+                    callback.onComplete(saved, null);
+                } catch (Exception error) {
+                    PortalLogger.error(context, assistantUrl, deviceId, "marin_toggle_failed",
+                            enabled ? "enable" : "disable", System.currentTimeMillis() - startedAt, error);
+                    callback.onComplete(!enabled, error);
+                }
+            }
+        }).start();
+    }
+
+    private static String enrollmentUrl(String assistantUrl) {
+        try {
+            URL parsed = new URL(assistantUrl);
+            return new URL(parsed.getProtocol(), parsed.getHost(), parsed.getPort(), "/api/device-enroll").toString();
+        } catch (Exception ignored) {
+            return DEFAULT_ENROLLMENT_URL;
+        }
+    }
+
+    private static String deviceConfigUrl(String assistantUrl) {
+        try {
+            URL parsed = new URL(assistantUrl);
+            return new URL(parsed.getProtocol(), parsed.getHost(), parsed.getPort(), "/api/device-config").toString();
+        } catch (Exception ignored) {
+            return "https://uniquepeople-web.vercel.app/api/device-config";
+        }
+    }
+
+    private static KeyPair getOrCreateKeyPair() throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        if (store.containsAlias(KEY_ALIAS)) {
+            return new KeyPair(store.getCertificate(KEY_ALIAS).getPublicKey(), privateKey());
+        }
+        KeyPairGenerator generator = KeyPairGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
+        generator.initialize(new KeyGenParameterSpec.Builder(KEY_ALIAS,
+                KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
+                .setDigests(KeyProperties.DIGEST_SHA256)
+                .build());
+        return generator.generateKeyPair();
+    }
+
+    private static PrivateKey privateKey() throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        return (PrivateKey) store.getKey(KEY_ALIAS, null);
+    }
+
+    private static void saveMemoryKey(Context context, String memoryKey) throws Exception {
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        cipher.init(Cipher.ENCRYPT_MODE, credentialStorageKey());
+        byte[] encrypted = cipher.doFinal(memoryKey.getBytes(StandardCharsets.UTF_8));
+        context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit()
+                .putString(MEMORY_CIPHER_PREF, Base64.encodeToString(encrypted, Base64.NO_WRAP))
+                .putString(MEMORY_IV_PREF, Base64.encodeToString(cipher.getIV(), Base64.NO_WRAP))
+                .apply();
+    }
+
+    private static SecretKey credentialStorageKey() throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        if (store.containsAlias(STORAGE_KEY_ALIAS)) {
+            return (SecretKey) store.getKey(STORAGE_KEY_ALIAS, null);
+        }
+        KeyGenerator generator = KeyGenerator.getInstance(
+                KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore");
+        generator.init(new KeyGenParameterSpec.Builder(STORAGE_KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT | KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build());
+        return generator.generateKey();
+    }
+
+    private static JSONObject request(String endpoint, String method, JSONObject payload) throws Exception {
+        HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+        connection.setConnectTimeout(10_000);
+        connection.setReadTimeout(10_000);
+        connection.setRequestMethod(method);
+        connection.setRequestProperty("Content-Type", "application/json");
+        connection.setDoOutput(true);
+        try (OutputStream output = connection.getOutputStream()) {
+            output.write(payload.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        int code = connection.getResponseCode();
+        BufferedReader reader = new BufferedReader(new InputStreamReader(
+                code < 400 ? connection.getInputStream() : connection.getErrorStream(),
+                StandardCharsets.UTF_8));
+        StringBuilder response = new StringBuilder();
+        for (String line; (line = reader.readLine()) != null;) response.append(line);
+        if (code >= 400) throw new IllegalStateException(method + " request failed (HTTP " + code + ").");
+        return new JSONObject(response.toString());
+    }
+}

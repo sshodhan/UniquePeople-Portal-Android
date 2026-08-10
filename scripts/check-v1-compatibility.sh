@@ -5,6 +5,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 MANIFEST="$ROOT/app/src/main/AndroidManifest.xml"
 MAIN="$ROOT/app/src/main/java/com/portal/slideshow/MainActivity.java"
 UPDATER="$ROOT/app/src/main/java/com/portal/slideshow/AndroidUpdateManager.java"
+ENROLLMENT="$ROOT/app/src/main/java/com/portal/slideshow/DeviceEnrollment.java"
+PORTAL_LOGGER="$ROOT/app/src/main/java/com/portal/slideshow/PortalLogger.java"
 STRINGS="$ROOT/app/src/main/res/values/strings.xml"
 STABILITY_DOC="$ROOT/docs/V1_STABILITY.md"
 
@@ -116,6 +118,8 @@ require_text "$MAIN" 'static final String KEY_ALBUM_URL = "album_url";' \
   "album preference key changed; installed v1 album would not be preserved"
 require_text "$MAIN" 'static final String KEY_DEVICE_ID = "device_id";' \
   "device ID preference key changed; per-device config pairing would break"
+require_text "$MAIN" 'static final String KEY_MARIN_ENABLED = "marin_enabled";' \
+  "Android must retain the canonical Marin enable flag"
 require_text "$MAIN" 'static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";' \
   "settings URL changed; update v1 stability notes and test before shipping"
 require_text "$MAIN" 'static final String DEFAULT_REMOTE_CONFIG_URL = "https://uniquepeople-web.vercel.app/api/device-config";' \
@@ -131,6 +135,35 @@ require_text "$MAIN" 'static final int MODE_GOOGLE_PHOTOS = 3;' \
 require_text "$MAIN" 'static final int MODE_PHOTO_HOST = 4;' \
   "Photo Host mode value changed; stored v1 mode may break"
 require_file "$UPDATER"
+require_file "$ENROLLMENT"
+require_file "$PORTAL_LOGGER"
+require_text "$ENROLLMENT" 'KeyStore.getInstance("AndroidKeyStore")' \
+  "Portal enrollment identity must remain in Android Keystore"
+require_text "$ENROLLMENT" '.put("deviceId", deviceId)' \
+  "Portal enrollment must bind the existing Settings device ID"
+require_text "$ENROLLMENT" '.put("action", "complete")' \
+  "Portal enrollment must prove possession before receiving memory access"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
+  'appendQueryParameter("memoryKey", memoryKey)' \
+  "Marin must receive the enrolled device memory credential"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/SettingsActivity.java" \
+  'assistantNav = nav("Assistant")' \
+  "Settings must retain the dedicated Assistant tab"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/SettingsActivity.java" \
+  'DeviceEnrollment.savedMemoryKey(this)' \
+  "Assistant settings must show the actual enrollment state"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/SettingsActivity.java" \
+  'DeviceEnrollment.setMarinEnabled' \
+  "Assistant settings must update the server-backed Marin flag"
+require_text "$PORTAL_LOGGER" '"/api/log-client-error"' \
+  "Android diagnostics must use the existing sanitized logging framework"
+require_text "$ENROLLMENT" '"enrollment_failed"' \
+  "enrollment failures must remain observable"
+require_text "$ENROLLMENT" '"marin_toggle_failed"' \
+  "Marin setting failures must remain observable"
+require_text "$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java" \
+  '"assistant_page_failed"' \
+  "Assistant WebView failures must remain observable"
 require_file "$ROOT/app/src/main/java/com/portal/slideshow/UpdateFileProvider.java"
 require_text "$MANIFEST" 'android.permission.REQUEST_INSTALL_PACKAGES' \
   "hosted updater baseline must declare package-install request permission"
