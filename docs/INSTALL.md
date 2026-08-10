@@ -15,6 +15,14 @@ UniquePeople displays a shared Google Photos or Google Drive link on a Meta Port
 
    The Portal should appear with the status `device`. If it says `unauthorized`, unlock the Portal and accept its USB debugging prompt.
 
+## Important: use at your own risk
+
+UniquePeople is an independent community project. It is not an official Meta product and is not endorsed, supported, or warranted by Meta.
+
+Sideloading software and enabling developer access can expose a device to additional security and stability risks. Installation may fail, settings or data may be lost, and device behavior may change. Although the installer attempts to preserve the existing APK for rollback and performs an in-place update, successful installation, rollback, compatibility, and continued device operation are not guaranteed.
+
+Review the source and installation script before running them, preserve any data you care about, and proceed only if you understand and accept the risks. You are solely responsible for the decision to install and use this software. The project and its contributors provide it **as is**, without warranties or guarantees, and are not responsible for device damage, data loss, account issues, service interruption, or other consequences arising from its installation or use.
+
 ## Install
 
 Copy and paste this entire block into a macOS or Linux shell:
