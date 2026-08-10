@@ -34,6 +34,9 @@ that spawned them.
 - `scripts/check-v1-compatibility.sh` runs the V1 stability guardrails and
   must pass before any push (CI runs it on every PR).
 - `scripts/check-learnings-format.sh` guards `LEARNINGS.md` numbering.
+- `scripts/check-hosted-release.sh` verifies the public install guide
+  (`docs/INSTALL.md`) matches the hosted APK; public releases follow
+  `docs/RELEASE_CHECKLIST.md`.
 
 ## Relationship to uniquepeople-web
 

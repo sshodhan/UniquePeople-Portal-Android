@@ -62,6 +62,21 @@ anything the OTA/hosted-update flow depends on.
 - [ ] Update/installer changes are exercised against
       `docs/V1_STABILITY.md` expectations and the V1 guardrails script.
 
+### 2d. Release and hosted install guide
+
+**Triggers:** changes to `docs/INSTALL.md`, `docs/RELEASE_CHECKLIST.md`,
+`scripts/install-hosted-apk.sh`, `scripts/install-release-candidate.sh`, or
+cutting a new public release.
+
+- [ ] A new public release follows `docs/RELEASE_CHECKLIST.md` end to end —
+      in particular step 9: upload the APK to the Blob store under the
+      checksum-named path, then refresh the `--url` and `--sha256` pinned in
+      `docs/INSTALL.md`.
+- [ ] `scripts/check-hosted-release.sh` passes — it downloads the guide's
+      pinned URL and verifies the hosted APK matches the pinned SHA-256. CI
+      runs it (`Hosted Release Consistency` workflow) on guide/installer
+      changes and weekly, so a forgotten step 9 goes red on its own.
+
 ## 3. Learning loop (Linear-wired)
 
 The recurring failure mode this loop prevents: a bug gets fixed, but the
