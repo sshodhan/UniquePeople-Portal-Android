@@ -96,6 +96,29 @@ convenience.
 
 ---
 
+## §4. Hardware attestation challenges need a compact transport contract
+
+**Origin:** AUR-53 Marin first-run enrollment, 2026-08.
+
+**Incident:** the physical Portal accepted the 32-byte feasibility challenge
+but rejected a full signed server token passed to `setAttestationChallenge`.
+The integrated flow only worked after separating the raw hardware challenge
+from its server authorization metadata.
+
+**Pattern:** decode the server's fixed-size random `challenge` into bytes for
+Android Keystore and return the opaque `challengeToken` unchanged at
+completion. Persist both with the generated key until completion succeeds so
+a lost HTTP response can retry the same transaction; never reuse a key
+attested to one challenge with a newly issued challenge.
+
+**Sibling risk:** any Android Keystore, StrongBox, or platform API whose input
+limits are narrower than the surrounding HTTP contract.
+
+**Guards:** the physical Portal contract run, offline release build, and the
+web repository's challenge-binding contract tests.
+
+---
+
 ## Key takeaways
 
 - §1 — Consume the web contract defensively: new fields may be absent, legacy
@@ -105,3 +128,5 @@ convenience.
   neutral software gain.
 - §3 — `build.sh` stays offline and Gradle-free; dependencies are vendored
   deliberately or not added.
+- §4 — Keep hardware attestation input compact; persist the challenge, token,
+  and key as one retryable transaction.

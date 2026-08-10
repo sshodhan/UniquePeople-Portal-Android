@@ -5,6 +5,7 @@ import android.security.keystore.KeyGenParameterSpec;
 import android.security.keystore.KeyProperties;
 import android.util.Base64;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -13,11 +14,11 @@ import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
-import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.Signature;
+import java.security.cert.Certificate;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -40,10 +41,12 @@ final class DeviceEnrollment {
         void onComplete(boolean enabled, Exception error);
     }
 
-    private static final String KEY_ALIAS = "uniquepeople_portal_identity";
+    private static final String KEY_ALIAS = "uniquepeople_portal_attested_identity_v2";
     private static final String STORAGE_KEY_ALIAS = "uniquepeople_portal_credential_storage";
     private static final String MEMORY_CIPHER_PREF = "assistant_memory_credential";
     private static final String MEMORY_IV_PREF = "assistant_memory_credential_iv";
+    private static final String PENDING_CHALLENGE_PREF = "assistant_enrollment_challenge_v2";
+    private static final String PENDING_CHALLENGE_TOKEN_PREF = "assistant_enrollment_challenge_token_v2";
     private static final String DEFAULT_ENROLLMENT_URL =
             "https://uniquepeople-web.vercel.app/api/device-enroll";
 
@@ -84,35 +87,58 @@ final class DeviceEnrollment {
                 PortalLogger.event(context, assistantUrl, deviceId, "enrollment_started",
                         "begin", 0);
                 try {
-                    KeyPair pair = getOrCreateKeyPair();
                     String endpoint = enrollmentUrl(assistantUrl);
-                    stage = "begin";
-                    JSONObject begin = request(endpoint, "POST", new JSONObject()
-                            .put("action", "begin")
-                            .put("deviceId", deviceId)
-                            .put("publicKey", Base64.encodeToString(
-                                    pair.getPublic().getEncoded(), Base64.NO_WRAP)));
-                    String challenge = begin.getString("challenge");
+                    String challenge = pendingChallenge(context);
+                    String challengeToken = pendingChallengeToken(context);
+                    if (challenge.isEmpty() || challengeToken.isEmpty() || !hasIdentityKey()) {
+                        clearPendingEnrollment(context);
+                        stage = "begin";
+                        JSONObject begin = request(endpoint, "POST", new JSONObject()
+                                .put("action", "begin")
+                                .put("deviceId", deviceId));
+                        challenge = begin.optString("challenge", "");
+                        challengeToken = begin.optString("challengeToken", "");
+                        if (challenge.isEmpty() || challengeToken.isEmpty()) {
+                            throw new IllegalStateException("Enrollment returned no challenge.");
+                        }
+                        savePendingChallenge(context, challenge, challengeToken);
+                        stage = "attest";
+                        generateAttestedKeyPair(challenge);
+                    }
 
-                    stage = "sign";
-                    Signature signer = Signature.getInstance("SHA256withECDSA");
-                    signer.initSign(privateKey());
-                    signer.update(challenge.getBytes(StandardCharsets.UTF_8));
                     stage = "complete";
+                    Signature signer = Signature.getInstance("SHA256withECDSA");
+                    signer.initSign(identityPrivateKey());
+                    signer.update(challengeToken.getBytes(StandardCharsets.UTF_8));
                     JSONObject complete = request(endpoint, "POST", new JSONObject()
                             .put("action", "complete")
                             .put("deviceId", deviceId)
                             .put("challenge", challenge)
-                            .put("signature", Base64.encodeToString(signer.sign(), Base64.NO_WRAP)));
+                            .put("challengeToken", challengeToken)
+                            .put("signature", Base64.encodeToString(signer.sign(), Base64.NO_WRAP))
+                            .put("certificateChain", encodedCertificateChain()));
 
-                    String memoryKey = complete.getString("memoryKey").trim();
+                    String memoryKey = complete.optString("memoryKey", "").trim();
                     if (memoryKey.isEmpty()) throw new IllegalStateException("Enrollment returned no memory key.");
                     stage = "credential_save";
                     saveMemoryKey(context, memoryKey);
+                    clearPendingChallenge(context);
                     PortalLogger.event(context, assistantUrl, deviceId, "enrollment_succeeded",
                             "credential_saved", System.currentTimeMillis() - startedAt);
                     callback.onComplete(memoryKey, null);
                 } catch (Exception error) {
+                    if ("complete".equals(stage) && error instanceof HttpStatusException
+                            && ((HttpStatusException) error).statusCode == 401) {
+                        try {
+                            clearPendingEnrollment(context);
+                            PortalLogger.event(context, assistantUrl, deviceId,
+                                    "enrollment_retry_reset", "attestation_rejected", 0);
+                        } catch (Exception resetError) {
+                            PortalLogger.error(context, assistantUrl, deviceId,
+                                    "enrollment_retry_reset_failed", "keystore",
+                                    System.currentTimeMillis() - startedAt, resetError);
+                        }
+                    }
                     PortalLogger.error(context, assistantUrl, deviceId, "enrollment_failed",
                             stage, System.currentTimeMillis() - startedAt, error);
                     callback.onComplete("", error);
@@ -165,25 +191,73 @@ final class DeviceEnrollment {
         }
     }
 
-    private static KeyPair getOrCreateKeyPair() throws Exception {
+    private static void generateAttestedKeyPair(String challenge) throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
-        if (store.containsAlias(KEY_ALIAS)) {
-            return new KeyPair(store.getCertificate(KEY_ALIAS).getPublicKey(), privateKey());
-        }
+        if (store.containsAlias(KEY_ALIAS)) store.deleteEntry(KEY_ALIAS);
         KeyPairGenerator generator = KeyPairGenerator.getInstance(
                 KeyProperties.KEY_ALGORITHM_EC, "AndroidKeyStore");
         generator.initialize(new KeyGenParameterSpec.Builder(KEY_ALIAS,
                 KeyProperties.PURPOSE_SIGN | KeyProperties.PURPOSE_VERIFY)
                 .setDigests(KeyProperties.DIGEST_SHA256)
+                .setAttestationChallenge(Base64.decode(challenge, Base64.DEFAULT))
                 .build());
-        return generator.generateKeyPair();
+        generator.generateKeyPair();
     }
 
-    private static PrivateKey privateKey() throws Exception {
+    private static boolean hasIdentityKey() throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        return store.containsAlias(KEY_ALIAS) && store.getCertificateChain(KEY_ALIAS) != null;
+    }
+
+    private static JSONArray encodedCertificateChain() throws Exception {
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        Certificate[] chain = store.getCertificateChain(KEY_ALIAS);
+        if (chain == null || chain.length == 0) {
+            throw new IllegalStateException("Android Keystore returned no attestation certificate chain.");
+        }
+        JSONArray encoded = new JSONArray();
+        for (Certificate certificate : chain) {
+            encoded.put(Base64.encodeToString(certificate.getEncoded(), Base64.NO_WRAP));
+        }
+        return encoded;
+    }
+
+    private static PrivateKey identityPrivateKey() throws Exception {
         KeyStore store = KeyStore.getInstance("AndroidKeyStore");
         store.load(null);
         return (PrivateKey) store.getKey(KEY_ALIAS, null);
+    }
+
+    private static String pendingChallenge(Context context) {
+        return context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                .getString(PENDING_CHALLENGE_PREF, "").trim();
+    }
+
+    private static String pendingChallengeToken(Context context) {
+        return context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE)
+                .getString(PENDING_CHALLENGE_TOKEN_PREF, "").trim();
+    }
+
+    private static void savePendingChallenge(Context context, String challenge, String challengeToken) {
+        context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit()
+                .putString(PENDING_CHALLENGE_PREF, challenge)
+                .putString(PENDING_CHALLENGE_TOKEN_PREF, challengeToken).commit();
+    }
+
+    private static void clearPendingChallenge(Context context) {
+        context.getSharedPreferences(MainActivity.PREFS, Context.MODE_PRIVATE).edit()
+                .remove(PENDING_CHALLENGE_PREF)
+                .remove(PENDING_CHALLENGE_TOKEN_PREF).apply();
+    }
+
+    private static void clearPendingEnrollment(Context context) throws Exception {
+        clearPendingChallenge(context);
+        KeyStore store = KeyStore.getInstance("AndroidKeyStore");
+        store.load(null);
+        if (store.containsAlias(KEY_ALIAS)) store.deleteEntry(KEY_ALIAS);
     }
 
     private static void saveMemoryKey(Context context, String memoryKey) throws Exception {
