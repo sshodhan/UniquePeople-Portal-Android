@@ -2,6 +2,10 @@
 
 Fullscreen Android photo-frame app for Meta Portal-style devices.
 
+## Marin enrollment
+
+The first time someone opens **Assistant**, the app silently enrolls its existing Settings device ID. It creates an EC signing key in Android Keystore, completes the server challenge, and keeps the returned device-scoped Marin memory credential in private app storage. Marin opens as soon as setup succeeds, and later Assistant clicks reuse the credential automatically; owners do not scan a second QR code, paste a URL, or manage a key. Normal Portal startup does not enroll a device that never uses Marin. App backup is disabled so the credential is not copied to another device.
+
 ## Default photos
 
 If no shared album, Drive folder, or video URL is configured, the app starts with bundled default photos. Tap the screen to reveal **Settings**, then paste a shared Google Photos or Google Drive link to replace the defaults on that device.

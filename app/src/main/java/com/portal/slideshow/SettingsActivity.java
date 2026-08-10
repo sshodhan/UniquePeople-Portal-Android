@@ -51,14 +51,17 @@ public class SettingsActivity extends Activity {
     private static final int GREEN = Color.rgb(77, 214, 143);
 
     private FrameLayout contentHost;
-    private TextView setupNav, advancedNav, updatesNav, sideDevice, sideStatus;
+    private TextView setupNav, assistantNav, advancedNav, updatesNav, sideDevice, sideStatus;
+    private TextView assistantStatus, assistantDetails;
     private TextView updateStatus, updateDetails;
+    private Switch marinToggle;
     private Button checkUpdateButton, installUpdateButton;
     private RadioButton nativeMode, webMode;
     private EditText photoHostField, videoField, assistantField;
     private Switch photoHostToggle;
     private PortalSettings draft;
     private boolean advanced;
+    private boolean assistantTab;
     private boolean updates;
     private float updatePullStartY;
     private AndroidUpdateManager.UpdateManifest availableUpdate;
@@ -90,9 +93,10 @@ public class SettingsActivity extends Activity {
         LinearLayout side = column(); side.setPadding(dp(34), dp(34), dp(24), dp(28)); side.setBackgroundColor(SIDE);
         side.addView(txt("UniquePeople", 25, TEXT, true));
         TextView sub = txt("V" + installedVersionName() + " Portal settings", 14, MUTED, false); side.addView(sub, top(5));
-        setupNav = nav("Setup"); advancedNav = nav("Advanced"); updatesNav = nav("Updates");
-        side.addView(setupNav, top(54)); side.addView(advancedNav, full()); side.addView(updatesNav, full());
+        setupNav = nav("Setup"); assistantNav = nav("Assistant"); advancedNav = nav("Advanced"); updatesNav = nav("Updates");
+        side.addView(setupNav, top(54)); side.addView(assistantNav, full()); side.addView(advancedNav, full()); side.addView(updatesNav, full());
         setupNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showSetup(); }});
+        assistantNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAssistant(); }});
         advancedNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showAdvanced(); }});
         updatesNav.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { showUpdates(); }});
         side.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
@@ -115,7 +119,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void showSetup() {
-        captureCurrent(); advanced = false; updates = false; styleNav(); contentHost.removeAllViews();
+        captureCurrent(); advanced = false; assistantTab = false; updates = false; styleNav(); contentHost.removeAllViews();
         LinearLayout content = page();
         content.addView(hero()); content.addView(identityBar(), top(18));
         content.addView(txt("Scan Album", 20, TEXT, true), section()); content.addView(scanCard());
@@ -167,7 +171,7 @@ public class SettingsActivity extends Activity {
     }
 
     private void showAdvanced() {
-        captureCurrent(); advanced = true; updates = false; styleNav(); contentHost.removeAllViews();
+        captureCurrent(); advanced = true; assistantTab = false; updates = false; styleNav(); contentHost.removeAllViews();
         LinearLayout content = page(); content.addView(txt("Advanced Settings", 31, TEXT, true));
         content.addView(txt("Manual URLs, fallback options, and assistant configuration.", 16, MUTED, false), top(8));
         LinearLayout cards = row(); cards.setGravity(Gravity.TOP);
@@ -197,8 +201,110 @@ public class SettingsActivity extends Activity {
         cards.addView(left, leftLp); cards.addView(right, rightLp); content.addView(cards, top(34)); mount(content);
     }
 
+    private void showAssistant() {
+        captureCurrent(); advanced = false; assistantTab = true; updates = false; styleNav(); contentHost.removeAllViews();
+        LinearLayout content = page();
+        content.addView(txt("Assistant", 31, TEXT, true));
+        content.addView(txt("Marin is enrolled automatically for this Portal.", 16, MUTED, false), top(8));
+
+        final boolean enabled = getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE)
+                .getBoolean(MainActivity.KEY_MARIN_ENABLED, true);
+        boolean enrolled = !DeviceEnrollment.savedMemoryKey(this).isEmpty();
+        LinearLayout connection = advancedCard("MARIN", "Assistant connection");
+        LinearLayout toggleRow = row(); toggleRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout toggleCopy = column(); toggleCopy.addView(txt("Use Marin on this Portal", 16, TEXT, true));
+        toggleCopy.addView(txt("Controls the Marin persona and conversation memory.", 13, MUTED, false), top(5));
+        toggleRow.addView(toggleCopy, new LinearLayout.LayoutParams(0, -2, 1));
+        marinToggle = new Switch(this); marinToggle.setContentDescription("Use Marin on this Portal");
+        marinToggle.setChecked(enabled); marinToggle.setShowText(false);
+        toggleRow.addView(marinToggle, new LinearLayout.LayoutParams(dp(72), dp(52)));
+        connection.addView(toggleRow, top(18));
+        marinToggle.setOnClickListener(new View.OnClickListener() {
+            public void onClick(View v) { updateMarinEnabled(marinToggle.isChecked(), enabled); }
+        });
+
+        assistantStatus = txt(!enabled ? "●  Marin is off" : enrolled ? "●  Memory connected" : "●  Finishing setup", 18,
+                !enabled ? MUTED : enrolled ? GREEN : Color.rgb(255, 190, 100), true);
+        connection.addView(assistantStatus, top(20));
+        assistantDetails = txt(!enabled
+                ? "Turn Marin on to use the assistant persona and household memory on this Portal. Existing notes are preserved."
+                : enrolled
+                ? "This Portal is securely enrolled. Marin can save and use household notes between sessions."
+                : "Setup begins when you open Marin. You can also retry it now.",
+                14, MUTED, false);
+        assistantDetails.setLineSpacing(0, 1.12f); connection.addView(assistantDetails, top(10));
+        connection.addView(identity("PORTAL ID", draft.deviceId, TEXT), top(22));
+
+        LinearLayout actions = row();
+        if (enabled) {
+            Button open = button("Open Marin", true);
+            open.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { openAssistant(); }});
+            actions.addView(open, new LinearLayout.LayoutParams(dp(190), dp(56)));
+        }
+        if (enabled && !enrolled) {
+            Button retry = button("Retry setup", false);
+            retry.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { retryAssistantEnrollment(v); }});
+            LinearLayout.LayoutParams retryLp = new LinearLayout.LayoutParams(dp(190), dp(56)); retryLp.leftMargin = dp(12); actions.addView(retry, retryLp);
+        }
+        connection.addView(actions, top(24));
+        content.addView(connection, top(30));
+
+        LinearLayout privacy = advancedCard("PRIVACY", "Private to this Portal");
+        privacy.addView(txt("The device identity and stored assistant credential are protected by Android Keystore. The credential is never shown in Settings or written to diagnostic logs.", 14, MUTED, false), top(18));
+        content.addView(privacy, top(18));
+        mount(content);
+    }
+
+    private void updateMarinEnabled(final boolean requested, final boolean previous) {
+        marinToggle.setEnabled(false);
+        assistantStatus.setText(requested ? "●  Turning Marin on…" : "●  Turning Marin off…");
+        assistantDetails.setText("Saving this Portal's assistant setting.");
+        DeviceEnrollment.setMarinEnabled(this, draft.deviceId, draft.assistantUrl, requested,
+                new DeviceEnrollment.SettingCallback() {
+            public void onComplete(final boolean saved, final Exception error) {
+                runOnUiThread(new Runnable() { public void run() {
+                    if (error != null) {
+                        getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
+                                .putBoolean(MainActivity.KEY_MARIN_ENABLED, previous).apply();
+                        marinToggle.setChecked(previous); marinToggle.setEnabled(true);
+                        assistantStatus.setText("●  Setting could not be saved");
+                        assistantStatus.setTextColor(Color.rgb(255, 145, 125));
+                        assistantDetails.setText("Check this Portal's internet connection and try again.");
+                        return;
+                    }
+                    getSharedPreferences(MainActivity.PREFS, MODE_PRIVATE).edit()
+                            .putBoolean(MainActivity.KEY_MARIN_ENABLED, saved).apply();
+                    showAssistant();
+                }});
+            }
+        });
+    }
+
+    private void retryAssistantEnrollment(final View button) {
+        button.setEnabled(false);
+        assistantStatus.setText("●  Setting up Marin…"); assistantStatus.setTextColor(Color.rgb(255, 190, 100));
+        assistantDetails.setText("Securely connecting this Portal to Marin's memory.");
+        DeviceEnrollment.ensureEnrolled(this, draft.deviceId, draft.assistantUrl, new DeviceEnrollment.Callback() {
+            public void onComplete(String memoryKey, final Exception error) {
+                runOnUiThread(new Runnable() { public void run() {
+                    button.setEnabled(true);
+                    if (error == null) showAssistant();
+                    else {
+                        assistantStatus.setText("●  Setup needs attention"); assistantStatus.setTextColor(Color.rgb(255, 145, 125));
+                        if (error instanceof DeviceEnrollment.HttpStatusException
+                                && ((DeviceEnrollment.HttpStatusException) error).statusCode == 409) {
+                            assistantDetails.setText("This Portal ID belongs to a previous installation. An administrator must reset its enrollment before memory can reconnect.");
+                        } else {
+                            assistantDetails.setText("Marin memory could not connect. Check this Portal's internet connection and try again. Marin can still open without memory.");
+                        }
+                    }
+                }});
+            }
+        });
+    }
+
     private void showUpdates() {
-        captureCurrent(); advanced = false; updates = true; styleNav(); contentHost.removeAllViews();
+        captureCurrent(); advanced = false; assistantTab = false; updates = true; styleNav(); contentHost.removeAllViews();
         LinearLayout content = page();
         content.addView(txt("Updates", 31, TEXT, true));
         content.addView(txt("View this Portal's installed build and check the hosted release channel.", 16, MUTED, false), top(8));
@@ -284,7 +390,7 @@ public class SettingsActivity extends Activity {
 
     private void captureSetup() { if (advanced || nativeMode == null) return; draft = copy(draft.sharedAlbumUrl, webMode.isChecked() ? PortalSettings.TileMode.WEB_DRIVEN : PortalSettings.TileMode.NATIVE, enabledTiles, draft.photoHostUrl, draft.videoFallbackUrl, draft.assistantUrl); }
     private void captureAdvanced() { if (!advanced || photoHostField == null) return; photoHostEnabled = photoHostToggle != null && photoHostToggle.isChecked(); draft = copy(draft.sharedAlbumUrl, draft.tileMode, draft.enabledTiles, value(photoHostField), value(videoField), value(assistantField)); }
-    private void captureCurrent() { if (advanced) captureAdvanced(); else if (!updates) captureSetup(); }
+    private void captureCurrent() { if (advanced) captureAdvanced(); else if (!updates && !assistantTab) captureSetup(); }
 
     private void save() {
         captureCurrent();
@@ -307,7 +413,7 @@ public class SettingsActivity extends Activity {
 
     private void refresh(final View button) {
         button.setEnabled(false); MainActivity.refreshRemoteConfigAsync(this, new MainActivity.RemoteConfigCallback() { public void onComplete(boolean ok, String message) {
-            button.setEnabled(true); if (ok) { draft = readSettings(); photoHostEnabled = isPhotoHostMode(); sideDevice.setText(deviceName()); sideStatus.setText("●  Synced just now"); if (advanced) showAdvanced(); else showSetup(); } Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
+            button.setEnabled(true); if (ok) { draft = readSettings(); photoHostEnabled = isPhotoHostMode(); sideDevice.setText(deviceName()); sideStatus.setText("●  Synced just now"); if (advanced) showAdvanced(); else if (assistantTab) showAssistant(); else if (updates) showUpdates(); else showSetup(); } Toast.makeText(SettingsActivity.this, message, Toast.LENGTH_LONG).show();
         }});
     }
 
@@ -330,9 +436,10 @@ public class SettingsActivity extends Activity {
     private void addChip(LinearLayout row, final String key, String label) { final TextView chip = txt(label, 14, TEXT, true); chip.setGravity(Gravity.CENTER); chip.setPadding(dp(18), 0, dp(18), 0); chip.setClickable(true); chips.put(key, chip); styleChip(chip, enabledTiles.contains(key)); chip.setOnClickListener(new View.OnClickListener() { public void onClick(View v) { if (enabledTiles.contains(key)) enabledTiles.remove(key); else enabledTiles.add(key); styleChip(chip, enabledTiles.contains(key)); }}); LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, dp(48)); lp.rightMargin = dp(10); row.addView(chip, lp); }
     private void styleChip(TextView chip, boolean enabled) { chip.setTextColor(enabled ? TEXT : MUTED); chip.setBackground(box(enabled ? Color.rgb(20, 76, 75) : BG, enabled ? TEAL : BORDER, 24)); }
     private void styleNav() {
-        boolean setup = !advanced && !updates;
-        setupNav.setTextColor(setup ? TEXT : MUTED); advancedNav.setTextColor(advanced ? TEXT : MUTED); updatesNav.setTextColor(updates ? TEXT : MUTED);
+        boolean setup = !advanced && !assistantTab && !updates;
+        setupNav.setTextColor(setup ? TEXT : MUTED); assistantNav.setTextColor(assistantTab ? TEXT : MUTED); advancedNav.setTextColor(advanced ? TEXT : MUTED); updatesNav.setTextColor(updates ? TEXT : MUTED);
         setupNav.setBackground(box(setup ? Color.rgb(18, 55, 57) : SIDE, setup ? TEAL : SIDE, 8));
+        assistantNav.setBackground(box(assistantTab ? Color.rgb(18, 55, 57) : SIDE, assistantTab ? TEAL : SIDE, 8));
         advancedNav.setBackground(box(advanced ? Color.rgb(18, 55, 57) : SIDE, advanced ? TEAL : SIDE, 8));
         updatesNav.setBackground(box(updates ? Color.rgb(18, 55, 57) : SIDE, updates ? TEAL : SIDE, 8));
     }

@@ -64,6 +64,7 @@ public class MainActivity extends Activity {
     static final String KEY_PHOTO_HOST_URL = "photo_host_url";
     static final String KEY_MODE = "mode";
     static final String KEY_ASSISTANT_URL = "assistant_url";
+    static final String KEY_MARIN_ENABLED = "marin_enabled";
     static final String KEY_DEVICE_ID = "device_id";
     static final String KEY_DEVICE_FRIENDLY_NAME = "device_friendly_name";
     static final String KEY_CURRENT_ALBUM_NAME = "current_album_name";
@@ -617,7 +618,9 @@ public class MainActivity extends Activity {
         overlay.setClickable(false);
         overlay.setVisibility(View.GONE);
         gear.setVisibility(View.VISIBLE);
-        assistant.setVisibility(View.VISIBLE);
+        boolean marinEnabled = getSharedPreferences(PREFS, MODE_PRIVATE)
+                .getBoolean(KEY_MARIN_ENABLED, true);
+        assistant.setVisibility(marinEnabled ? View.VISIBLE : View.GONE);
         if (tileRail != null) tileRail.bringToFront();
         if (hostedTilesView != null) hostedTilesView.bringToFront();
         gear.bringToFront();
@@ -973,6 +976,7 @@ public class MainActivity extends Activity {
         if (isValidWebUrl(albumUrl)) editor.putString(KEY_ALBUM_URL, albumUrl);
         if (isValidWebUrl(photoHostUrl)) editor.putString(KEY_PHOTO_HOST_URL, photoHostUrl);
         if (isValidWebUrl(assistantUrl)) editor.putString(KEY_ASSISTANT_URL, assistantUrl);
+        if (config.has("marinEnabled")) editor.putBoolean(KEY_MARIN_ENABLED, config.optBoolean("marinEnabled", true));
         if (isValidWebUrl(hostedTilesUrl)) editor.putString(KEY_HOSTED_TILES_URL, hostedTilesUrl);
         if (dashboard != null) {
             String tileRenderer = dashboard.optString("tileRenderer", "");
