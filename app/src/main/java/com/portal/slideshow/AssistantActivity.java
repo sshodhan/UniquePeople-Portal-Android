@@ -183,6 +183,7 @@ public class AssistantActivity extends Activity {
             public void onComplete(final String memoryKey, final Exception error) {
                 runOnUiThread(new Runnable() {
                     public void run() {
+                        if (isFinishing() || isDestroyed() || webView == null) return;
                         if (error != null) {
                             PortalLogger.event(AssistantActivity.this, pendingAssistantUrl, deviceId,
                                     "assistant_memoryless_fallback", "enrollment", elapsed());
@@ -202,6 +203,7 @@ public class AssistantActivity extends Activity {
     }
 
     private void loadAssistantPage(String deviceId, String memoryKey) {
+        if (isFinishing() || isDestroyed() || webView == null) return;
         Uri.Builder builder = Uri.parse(pendingAssistantUrl).buildUpon();
         Uri current = Uri.parse(pendingAssistantUrl);
         if (current.getQueryParameter("deviceId") == null) {
