@@ -19,11 +19,15 @@ root cause could recur elsewhere, add or reinforce a lesson — see
 ## Issue tracking is Linear, not markdown
 
 Bugs, deferred findings, and follow-ups are tracked as Linear issues in the
-**Aura Agents** team (`AUR-NN` ids), not in a bug-log file. When a review or a
-sibling sweep surfaces something out of scope for the current PR, file it in
-Linear with the PR linked, and cite the `AUR-NN` id wherever the finding is
-mentioned. Lessons in `LEARNINGS.md` cross-reference the `AUR-NN` incidents
-that spawned them.
+**Aura Agents** team (`AUR-NN` ids), not in a bug-log file. They belong to the
+**UniquePeople** project
+(<https://linear.app/aura-agents/project/uniquepeople-4e38fda5c15b>) — set the
+project when filing, because the team alone leaves the issue out of the view
+this work is tracked in; a follow-up inherits the project of its parent issue.
+When a review or a sibling sweep surfaces something out of scope for the
+current PR, file it in Linear with the PR linked, and cite the `AUR-NN` id
+wherever the finding is mentioned. Lessons in `LEARNINGS.md` cross-reference
+the `AUR-NN` incidents that spawned them.
 
 ## Build and checks
 

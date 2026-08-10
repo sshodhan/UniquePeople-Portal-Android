@@ -86,9 +86,14 @@ sibling feature. Close the loop on every PR.
 ### Required when the PR fixes a bug or hit a non-obvious gotcha
 
 - [ ] **A Linear issue exists** for each bug fixed (Aura Agents team,
-      `AUR-NN`), linked to the PR, and is closed by (or referenced from) this
-      PR. For bugs found but deferred, file the issue with the PR attached and
-      a priority set — a finding mentioned only in a comment thread is lost.
+      **UniquePeople** project, `AUR-NN`), linked to the PR, and is closed by
+      (or referenced from) this PR. For bugs found but deferred, file the issue
+      with the PR attached and a priority set — a finding mentioned only in a
+      comment thread is lost.
+- [ ] **Every issue this PR files or touches has the UniquePeople project
+      set** — the team alone is not enough, and an issue with no project is
+      missing from the view this work is tracked in. Follow-ups inherit the
+      project of their parent issue.
 - [ ] **A regression guard exists** — a check in
       `scripts/check-v1-compatibility.sh` (or a new script wired into CI) that
       fails against the pre-fix code and passes after.

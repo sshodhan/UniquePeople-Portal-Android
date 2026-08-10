@@ -7,12 +7,12 @@ incident that spawned it.
 > **Numbering:** each `## §N` heading is a stable, unique id — cite it as `§N`
 > from PRs, Linear issues, and reviews. Add a new lesson with the next unused
 > number; **never reuse a number**. Numbers are ids, not a reading order, so
-> gaps are expected and fine. Incidents are tracked in Linear (Aura Agents,
-> `AUR-NN`) and cross-referenced from here; this file holds only the
-> generalized classes. `scripts/check-learnings-format.sh` guards the
-> numbering. The web repo (`sshodhan/uniquepeople-web`) keeps its own
-> `LEARNINGS.md`; lessons that span both sides are recorded in each repo from
-> that repo's perspective.
+> gaps are expected and fine. Incidents are tracked in Linear (Aura Agents
+> team, UniquePeople project, `AUR-NN`) and cross-referenced from here; this
+> file holds only the generalized classes. `scripts/check-learnings-format.sh`
+> guards the numbering. The web repo (`sshodhan/uniquepeople-web`) keeps its
+> own `LEARNINGS.md`; lessons that span both sides are recorded in each repo
+> from that repo's perspective.
 
 ---
 
