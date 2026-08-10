@@ -37,7 +37,8 @@ chmod +x install-hosted-apk.sh
 # Download, verify, and install the release-signed UniquePeople APK.
 ./install-hosted-apk.sh \
   --url https://evzbmbfhebyftwmu.public.blob.vercel-storage.com/uniquepeople/releases/uniquepeople-3.4-vc7-789c052b4d2f.apk \
-  --sha256 789c052b4d2fb2e4c86dd9cfa13846eb29f48fb2210ba808c72eb1ec8220a1ed
+  --sha256 789c052b4d2fb2e4c86dd9cfa13846eb29f48fb2210ba808c72eb1ec8220a1ed \
+  --rollback-root "$PWD/rollback-apks/handoff"
 ```
 
 The installer verifies the APK checksum before contacting the Portal. If UniquePeople is already installed, it saves the existing APK and package information under `rollback-apks/handoff/`, then performs an in-place update so the app's saved settings are preserved.
