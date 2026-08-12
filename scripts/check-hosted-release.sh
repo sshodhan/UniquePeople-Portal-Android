@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Hosted-release consistency guard: verifies that the public installation
 # guide (docs/INSTALL.md) agrees with what the hosted APK URL actually
-# serves. The guide pins a fixed --url and --sha256; releases that forget to
-# refresh them (docs/RELEASE_CHECKLIST.md step 9) leave users installing a
-# stale or missing APK. This check downloads the pinned URL and compares its
-# SHA-256 against the pinned checksum.
+# serves. The guide pins a fixed --url and --sha256 and may repeat that URL in
+# simpler install examples. Releases that forget to refresh every occurrence
+# (docs/RELEASE_CHECKLIST.md step 9) leave users installing a stale or missing
+# APK. This check requires every public Blob APK URL in the guide to match the
+# canonical --url, then downloads it and compares its SHA-256.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -22,6 +23,17 @@ sha="$(grep -Eo -- '--sha256 [0-9a-f]{64}' "$GUIDE" | head -1 | cut -d' ' -f2 ||
 
 [[ -n "$url" ]] || fail "could not find a '--url https://...' value in docs/INSTALL.md"
 [[ -n "$sha" ]] || fail "could not find a '--sha256 <64 hex>' value in docs/INSTALL.md"
+
+guide_urls="$(grep -Eo 'https://[^[:space:]]+' "$GUIDE" \
+  | sed 's/[\\`]*$//' \
+  | grep -E '\.public\.blob\.vercel-storage\.com/.+\.apk$' || true)"
+[[ -n "$guide_urls" ]] || fail "could not find a public Blob APK URL in docs/INSTALL.md"
+while IFS= read -r guide_url; do
+  [[ "$guide_url" == "$url" ]] \
+    || fail "install guide contains a stale APK URL: $guide_url (canonical release is $url)"
+done <<EOF
+$guide_urls
+EOF
 
 echo "guide URL:    $url"
 echo "guide SHA256: $sha"

@@ -115,9 +115,9 @@ hosted URL actually serves.
   The uploader refuses overwrites and verifies the hosted file's size and
   SHA-256 before reporting success. Signing credentials stay in the Android
   release environment and are never passed to the web repository.
-- Update the `--url` and `--sha256` values in the Install block of
-  `docs/INSTALL.md`. The generic `scripts/install-hosted-apk.sh` itself should
-  not need changes.
+- Update **every APK URL** in `docs/INSTALL.md`, including the simple
+  first-time block, plus the `--sha256` value in the verified-upgrade block.
+  The generic `scripts/install-hosted-apk.sh` itself should not need changes.
 - Run `scripts/check-hosted-release.sh` locally to confirm the guide, the
   hosted URL, and the checksum agree.
 - Test the guide's copy-and-paste install block end to end on a real Portal.

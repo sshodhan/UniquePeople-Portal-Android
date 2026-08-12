@@ -29,14 +29,12 @@ If UniquePeople is not already installed, copy and paste this block into a
 macOS or Linux shell:
 
 ```bash
-# Download the release-signed UniquePeople APK.
-curl -L -o uniquepeople.apk \
-  https://evzbmbfhebyftwmu.public.blob.vercel-storage.com/uniquepeople/releases/uniquepeople-3.5-vc8-90686635498f.apk
+# Download the release-signed APK. Stop if the download is unsuccessful.
+curl --fail --location --remove-on-error -o uniquepeople.apk \
+  https://evzbmbfhebyftwmu.public.blob.vercel-storage.com/uniquepeople/releases/uniquepeople-3.5-vc8-90686635498f.apk && \
 
-# Install it on the connected Portal.
-adb install uniquepeople.apk
-
-# Launch UniquePeople.
+# Install and launch only after a successful download.
+adb install uniquepeople.apk && \
 adb shell monkey -p com.portal.slideshow \
   -c android.intent.category.LAUNCHER 1
 ```
