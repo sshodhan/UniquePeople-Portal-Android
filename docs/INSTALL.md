@@ -36,8 +36,8 @@ chmod +x install-hosted-apk.sh
 
 # Download, verify, and install the release-signed UniquePeople APK.
 ./install-hosted-apk.sh \
-  --url https://evzbmbfhebyftwmu.public.blob.vercel-storage.com/uniquepeople/releases/uniquepeople-3.4-vc7-789c052b4d2f.apk \
-  --sha256 789c052b4d2fb2e4c86dd9cfa13846eb29f48fb2210ba808c72eb1ec8220a1ed \
+  --url https://evzbmbfhebyftwmu.public.blob.vercel-storage.com/uniquepeople/releases/uniquepeople-3.5-vc8-90686635498f.apk \
+  --sha256 90686635498f2b9c8b8c2e20191c42e9ccb2a14702f8438ebe3024810f00df26 \
   --rollback-root "$PWD/rollback-apks/handoff"
 ```
 

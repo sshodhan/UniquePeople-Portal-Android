@@ -9,6 +9,8 @@ ENROLLMENT="$ROOT/app/src/main/java/com/portal/slideshow/DeviceEnrollment.java"
 PORTAL_LOGGER="$ROOT/app/src/main/java/com/portal/slideshow/PortalLogger.java"
 STRINGS="$ROOT/app/src/main/res/values/strings.xml"
 STABILITY_DOC="$ROOT/docs/V1_STABILITY.md"
+RELEASE_CHECKLIST="$ROOT/docs/RELEASE_CHECKLIST.md"
+REVIEW_CHECKLIST="$ROOT/.github/claude-review.md"
 
 fail() {
   echo "V1 compatibility check failed: $*" >&2
@@ -40,6 +42,17 @@ require_file "$MANIFEST"
 require_file "$MAIN"
 require_file "$STRINGS"
 require_file "$STABILITY_DOC"
+require_file "$RELEASE_CHECKLIST"
+require_file "$REVIEW_CHECKLIST"
+
+require_text "$REVIEW_CHECKLIST" 'Should the finalized signed APK' \
+  "pre-PR review must ask whether the finalized APK should be published"
+require_text "$REVIEW_CHECKLIST" '2d Production distribution:' \
+  "pre-PR review summary must record the production distribution decision"
+require_text "$RELEASE_CHECKLIST" 'Opening or merging an Android PR never publishes an APK automatically.' \
+  "release checklist must keep production publication explicit"
+require_text "$RELEASE_CHECKLIST" 'npm run upload:android-release -- <PATH_TO_APP_RELEASE_APK>' \
+  "release checklist must reference the reusable Blob upload workflow"
 
 require_text "$MANIFEST" 'package="com.portal.slideshow"' \
   "package name changed; installed v1 settings would not be preserved"

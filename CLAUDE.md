@@ -41,6 +41,10 @@ the `AUR-NN` incidents that spawned them.
 - `scripts/check-hosted-release.sh` verifies the public install guide
   (`docs/INSTALL.md`) matches the hosted APK; public releases follow
   `docs/RELEASE_CHECKLIST.md`.
+- Every Android PR finalization must explicitly ask whether its signed APK
+  should replace the production build in the public distribution store. Record
+  **Publish** or **Do not publish** under review checklist §2d; merging alone
+  never authorizes or triggers an upload.
 
 ## Relationship to uniquepeople-web
 

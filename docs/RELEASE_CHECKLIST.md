@@ -7,6 +7,21 @@ is:
 scripts/install-release-candidate.sh -s <PORTAL_SERIAL>
 ```
 
+## Release decision at PR finalization
+
+Every Android PR must make the distribution decision explicit before merge:
+
+- **Publish:** this PR contains the next production release. Complete this
+  checklist end to end, including the physical Portal test, immutable Blob
+  upload, `docs/INSTALL.md` update, and hosted-release consistency check.
+- **Do not publish:** this is an intermediate, documentation-only, test, or
+  otherwise non-production change. Record that decision in the Pre-PR Review
+  Summary. Do not upload an APK or change the public install guide.
+
+Opening or merging an Android PR never publishes an APK automatically. The
+release owner must deliberately choose **Publish** after reviewing the signed
+artifact and test evidence.
+
 ## 1. Sync and validate
 
 - Fetch and rebase onto `origin/main`.
@@ -87,6 +102,19 @@ hosted URL actually serves.
 - Upload the APK to the Vercel Blob store under
   `uniquepeople/releases/uniquepeople-<versionName>-<first-12-of-sha256>.apk`.
   Blob URLs are immutable — each release is a new file, never an overwrite.
+- From a checkout of `sshodhan/uniquepeople-web` with its ignored
+  `.env.local` containing `ANDROID_RELEASES_READ_WRITE_TOKEN`, preview and then
+  perform the upload. Pass the APK path explicitly; the repositories may be
+  checked out anywhere:
+
+  ```bash
+  npm run upload:android-release -- <PATH_TO_APP_RELEASE_APK> <VERSION_NAME> <VERSION_CODE> --dry-run
+  npm run upload:android-release -- <PATH_TO_APP_RELEASE_APK> <VERSION_NAME> <VERSION_CODE>
+  ```
+
+  The uploader refuses overwrites and verifies the hosted file's size and
+  SHA-256 before reporting success. Signing credentials stay in the Android
+  release environment and are never passed to the web repository.
 - Update the `--url` and `--sha256` values in the Install block of
   `docs/INSTALL.md`. The generic `scripts/install-hosted-apk.sh` itself should
   not need changes.
