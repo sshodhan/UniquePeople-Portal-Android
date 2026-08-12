@@ -64,9 +64,16 @@ anything the OTA/hosted-update flow depends on.
 
 ### 2d. Release and hosted install guide
 
-**Triggers:** changes to `docs/INSTALL.md`, `docs/RELEASE_CHECKLIST.md`,
-`scripts/install-hosted-apk.sh`, `scripts/install-release-candidate.sh`, or
-cutting a new public release.
+**Triggers:** every Android PR. The release decision is always required; the
+remaining checks apply when changing `docs/INSTALL.md`,
+`docs/RELEASE_CHECKLIST.md`, `scripts/install-hosted-apk.sh`,
+`scripts/install-release-candidate.sh`, or cutting a new public release.
+
+- [ ] **Ask the release owner before merge:** “Should the finalized signed APK
+      from this PR become the production build in the public distribution
+      store?” Record exactly one decision in the review summary:
+      **Publish — checklist completed** or **Do not publish — <reason>**.
+      Never infer publication merely because a PR is ready or merged.
 
 - [ ] A new public release follows `docs/RELEASE_CHECKLIST.md` end to end —
       in particular step 9: upload the APK to the Blob store under the
@@ -139,6 +146,9 @@ audit the reasoning:
 - 2a WebView/audio/permissions: [checks run and results, or "N/A — <why>"]
 - 2b Web contract consumption: [same]
 - 2c Self-contained build/updater: [same]
+- 2d Production distribution: ["Publish — checklist completed" with artifact,
+  Blob URL, checksum, Portal evidence, and install-guide check; or "Do not
+  publish — <reason>"]
 
 **Sibling / class sweep (per fix):**
 - [pattern grepped, files checked, per-file verdict "fixed in this PR" /
