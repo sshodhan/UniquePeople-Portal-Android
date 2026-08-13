@@ -5,23 +5,42 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Base64;
+import android.util.Log;
+
+import java.nio.charset.StandardCharsets;
 
 /** Shell-only entry point for deterministic physical Portal voice tests. */
 public class PortalVoiceHarnessActivity extends Activity {
 
     private static final String PRODUCTION_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
+    private static final String LOG_TAG = "PortalVoiceHarness";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        String requestedUrl = getIntent().getStringExtra("assistant_url");
+        String requestedUrl = decodeUrl(getIntent().getStringExtra("assistant_url_base64"));
         Uri uri = TextUtils.isEmpty(requestedUrl) ? null : Uri.parse(requestedUrl);
         if (uri != null && isAllowedAssistantUrl(uri, false)) {
+            Log.i(LOG_TAG, "{\"event\":\"harness_activity_accepted\",\"timestamp\":"
+                    + System.currentTimeMillis() + "}");
             Intent assistant = new Intent(this, AssistantActivity.class);
             assistant.putExtra("assistant_url", uri.toString());
             startActivity(assistant);
+        } else {
+            Log.w(LOG_TAG, "{\"event\":\"harness_activity_rejected\",\"timestamp\":"
+                    + System.currentTimeMillis() + "}");
         }
         finish();
+    }
+
+    private static String decodeUrl(String encoded) {
+        if (TextUtils.isEmpty(encoded) || encoded.length() > 8000) return "";
+        try {
+            return new String(Base64.decode(encoded, Base64.DEFAULT), StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return "";
+        }
     }
 
     static boolean isAllowedAssistantUrl(Uri uri, boolean requireRunId) {

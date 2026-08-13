@@ -175,6 +175,8 @@ require_text "$ASSISTANT" 'addJavascriptInterface(new PortalVoiceHarnessBridge()
   "physical voice harness bridge must remain installed"
 require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
   "physical voice harness must validate target and restore URLs"
+require_text "$VOICE_HARNESS" 'assistant_url_base64' \
+  "physical voice harness must use shell-safe URL transport"
 require_text "$ENROLLMENT" 'KeyStore.getInstance("AndroidKeyStore")' \
   "Portal enrollment identity must remain in Android Keystore"
 require_text "$ENROLLMENT" '.put("deviceId", deviceId)' \
