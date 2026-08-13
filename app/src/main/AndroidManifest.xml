@@ -61,5 +61,14 @@
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout"
             android:theme="@android:style/Theme.NoTitleBar.Fullscreen" />
 
+        <activity
+            android:name=".PortalVoiceHarnessActivity"
+            android:exported="true"
+            android:permission="android.permission.DUMP"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.NoDisplay" />
+
     </application>
 </manifest>

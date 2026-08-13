@@ -119,6 +119,31 @@ web repository's challenge-binding contract tests.
 
 ---
 
+## §5. Device test hooks need a complete, least-privilege transport
+
+**Origin:** AUR-20 physical voice interruption harness, 2026-08.
+
+**Incident:** the web client forwarded correlated harness events and the
+desktop runner expected to launch the assistant directly, but the signed APK
+had neither the JavaScript bridge nor an exported test entry. The harness was
+therefore locally green while the real Portal path could not start or emit a
+single event.
+
+**Pattern:** an end-to-end device harness must validate every transport hop in
+the shipped artifact. Keep production activities non-exported; expose a
+separate shell-only entry protected by a signature permission, validate all
+incoming URLs and bounded correlation identifiers, and allowlist fields again
+at the native logging boundary. Never log target URLs, credentials, transcript
+text, or arbitrary web payloads.
+
+**Sibling risk:** WebView debugging bridges, deep links, update-test entry
+points, and any instrumentation that crosses from hosted code into the APK.
+
+**Guards:** `scripts/check-v1-compatibility.sh`, the offline APK build, and a
+physical run that proves launch, event forwarding, and production restoration.
+
+---
+
 ## Key takeaways
 
 - §1 — Consume the web contract defensively: new fields may be absent, legacy
@@ -130,3 +155,5 @@ web repository's challenge-binding contract tests.
   deliberately or not added.
 - §4 — Keep hardware attestation input compact; persist the challenge, token,
   and key as one retryable transaction.
+- §5 — Physical test hooks must be complete in the APK and least-privilege:
+  shell-only launch, validated inputs, and allowlisted native telemetry.

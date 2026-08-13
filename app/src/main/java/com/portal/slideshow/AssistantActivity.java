@@ -12,6 +12,8 @@ import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.util.Log;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -23,9 +25,13 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import org.json.JSONObject;
+
 public class AssistantActivity extends Activity {
 
     private static final int REQ_MEDIA = 301;
+    private static final String VOICE_HARNESS_LOG_TAG = "PortalVoiceHarness";
+    private static final int MAX_HARNESS_EVENT_LENGTH = 12000;
 
     private WebView webView;
     private TextView status;
@@ -34,6 +40,7 @@ public class AssistantActivity extends Activity {
     private long assistantStartedAt;
     private String assistantDeviceId;
     private boolean mainFrameFailed;
+    private String voiceHarnessRunId = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,10 +103,15 @@ public class AssistantActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
+        webView.addJavascriptInterface(new PortalVoiceHarnessBridge(), "PortalVoiceHarness");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                if (!TextUtils.isEmpty(voiceHarnessRunId)
+                        && !PortalVoiceHarnessActivity.isAllowedAssistantUrl(request.getUrl(), true)) {
+                    return true;
+                }
                 return false;
             }
 
@@ -168,6 +180,8 @@ public class AssistantActivity extends Activity {
                 : previewUrl.trim();
         if (url.length() == 0) url = MainActivity.DEFAULT_ASSISTANT_URL;
         pendingAssistantUrl = url;
+        voiceHarnessRunId = Uri.parse(pendingAssistantUrl).getQueryParameter("voiceHarnessRunId");
+        if (voiceHarnessRunId == null) voiceHarnessRunId = "";
         PortalLogger.event(this, pendingAssistantUrl, assistantDeviceId,
                 "assistant_opened", "launch", 0);
         status.setText("Setting up Marin...");
@@ -219,6 +233,75 @@ public class AssistantActivity extends Activity {
 
     private long elapsed() {
         return assistantStartedAt == 0 ? 0 : System.currentTimeMillis() - assistantStartedAt;
+    }
+
+    private final class PortalVoiceHarnessBridge {
+        @JavascriptInterface
+        public void record(String payload) {
+            if (TextUtils.isEmpty(voiceHarnessRunId)
+                    || payload == null
+                    || payload.length() == 0
+                    || payload.length() > MAX_HARNESS_EVENT_LENGTH
+                    || !PortalVoiceHarnessActivity.isAllowedAssistantUrl(Uri.parse(pendingAssistantUrl), true)) {
+                return;
+            }
+            try {
+                JSONObject input = new JSONObject(payload);
+                JSONObject inputData = input.optJSONObject("data");
+                if (inputData == null || !voiceHarnessRunId.equals(inputData.optString("runId", ""))) return;
+
+                String event = input.optString("event", "");
+                if (!event.matches("[a-z0-9_]{1,96}")) return;
+
+                JSONObject output = new JSONObject();
+                output.put("event", event);
+                output.put("timestamp", input.optLong("timestamp", System.currentTimeMillis()));
+                output.put("sessionId", bounded(input.optString("sessionId", ""), 160));
+                JSONObject data = new JSONObject();
+                copyString(inputData, data, "runId", 180);
+                copyString(inputData, data, "sessionId", 160);
+                copyString(inputData, data, "turnId", 160);
+                copyString(inputData, data, "responseId", 160);
+                copyString(inputData, data, "taskId", 160);
+                copyString(inputData, data, "candidateId", 160);
+                copyString(inputData, data, "utteranceId", 160);
+                copyString(inputData, data, "reason", 96);
+                copyString(inputData, data, "terminalReason", 96);
+                copyString(inputData, data, "decision", 64);
+                copyString(inputData, data, "disposition", 96);
+                copyString(inputData, data, "cancellationState", 64);
+                copyString(inputData, data, "playbackState", 64);
+                copyNumber(inputData, data, "durationMs");
+                copyNumber(inputData, data, "transcriptLength");
+                copyNumber(inputData, data, "textLength");
+                copyNumber(inputData, data, "microphoneSampleCount");
+                copyNumber(inputData, data, "microphoneUnmutedSampleCount");
+                copyNumber(inputData, data, "microphoneAverageLevel");
+                copyNumber(inputData, data, "microphonePeakLevel");
+                copyNumber(inputData, data, "microphoneCandidateSampleCount");
+                copyNumber(inputData, data, "microphoneCandidateUnmutedSampleCount");
+                copyNumber(inputData, data, "microphoneCandidateAverageLevel");
+                copyNumber(inputData, data, "microphoneCandidatePeakLevel");
+                output.put("data", data);
+                Log.i(VOICE_HARNESS_LOG_TAG, output.toString());
+            } catch (Exception ignored) {
+                // Test instrumentation must never affect the assistant.
+            }
+        }
+    }
+
+    private static void copyString(JSONObject source, JSONObject target, String key, int maxLength) throws Exception {
+        if (!source.has(key)) return;
+        target.put(key, bounded(source.optString(key, ""), maxLength));
+    }
+
+    private static void copyNumber(JSONObject source, JSONObject target, String key) throws Exception {
+        if (source.has(key) && source.opt(key) instanceof Number) target.put(key, source.opt(key));
+    }
+
+    private static String bounded(String value, int maxLength) {
+        if (value == null) return "";
+        return value.length() <= maxLength ? value : value.substring(0, maxLength);
     }
 
     private void requestMediaPermissionsIfNeeded() {

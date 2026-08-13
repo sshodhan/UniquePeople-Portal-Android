@@ -7,6 +7,8 @@ MAIN="$ROOT/app/src/main/java/com/portal/slideshow/MainActivity.java"
 UPDATER="$ROOT/app/src/main/java/com/portal/slideshow/AndroidUpdateManager.java"
 ENROLLMENT="$ROOT/app/src/main/java/com/portal/slideshow/DeviceEnrollment.java"
 PORTAL_LOGGER="$ROOT/app/src/main/java/com/portal/slideshow/PortalLogger.java"
+ASSISTANT="$ROOT/app/src/main/java/com/portal/slideshow/AssistantActivity.java"
+VOICE_HARNESS="$ROOT/app/src/main/java/com/portal/slideshow/PortalVoiceHarnessActivity.java"
 STRINGS="$ROOT/app/src/main/res/values/strings.xml"
 STABILITY_DOC="$ROOT/docs/V1_STABILITY.md"
 RELEASE_CHECKLIST="$ROOT/docs/RELEASE_CHECKLIST.md"
@@ -163,6 +165,16 @@ require_text "$MAIN" 'static final int MODE_PHOTO_HOST = 4;' \
 require_file "$UPDATER"
 require_file "$ENROLLMENT"
 require_file "$PORTAL_LOGGER"
+require_file "$ASSISTANT"
+require_file "$VOICE_HARNESS"
+require_text "$MANIFEST" 'android:name=".PortalVoiceHarnessActivity"' \
+  "physical voice harness entry point must remain explicit"
+require_text "$MANIFEST" 'android:permission="android.permission.DUMP"' \
+  "physical voice harness entry point must remain shell-protected"
+require_text "$ASSISTANT" 'addJavascriptInterface(new PortalVoiceHarnessBridge(), "PortalVoiceHarness")' \
+  "physical voice harness bridge must remain installed"
+require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
+  "physical voice harness must validate target and restore URLs"
 require_text "$ENROLLMENT" 'KeyStore.getInstance("AndroidKeyStore")' \
   "Portal enrollment identity must remain in Android Keystore"
 require_text "$ENROLLMENT" '.put("deviceId", deviceId)' \
