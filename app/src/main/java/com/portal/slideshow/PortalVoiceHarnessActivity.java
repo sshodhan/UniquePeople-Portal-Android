@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 /** Shell-only entry point for deterministic physical Portal voice tests. */
 public class PortalVoiceHarnessActivity extends Activity {
 
-    private static final String PRODUCTION_ASSISTANT_URL = "https://uniquepeople-web.vercel.app/assistant";
     private static final String LOG_TAG = "PortalVoiceHarness";
 
     @Override
@@ -52,8 +51,20 @@ public class PortalVoiceHarnessActivity extends Activity {
         String runId = uri.getQueryParameter("voiceHarnessRunId");
         String scenario = uri.getQueryParameter("voiceHarnessScenario");
         if (requireRunId) return isSafeToken(runId, 180) && isSafeToken(scenario, 120);
-        if (PRODUCTION_ASSISTANT_URL.equals(uri.toString())) return true;
+        if (isProductionRestoreUrl(uri)) return true;
         return isSafeToken(runId, 180) && isSafeToken(scenario, 120);
+    }
+
+    private static boolean isProductionRestoreUrl(Uri uri) {
+        if (!"uniquepeople-web.vercel.app".equalsIgnoreCase(uri.getHost())
+                || !"/assistant".equals(uri.getPath())
+                || uri.getQueryParameter("voiceHarnessRunId") != null
+                || uri.getQueryParameter("voiceHarnessScenario") != null) {
+            return false;
+        }
+        String deviceId = uri.getQueryParameter("deviceId");
+        return uri.getQueryParameterNames().size() == (deviceId == null ? 0 : 1)
+                && (deviceId == null || isSafeToken(deviceId, 120));
     }
 
     private static boolean isSafeToken(String value, int maxLength) {

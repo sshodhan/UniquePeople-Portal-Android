@@ -177,6 +177,8 @@ require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
   "physical voice harness must validate target and restore URLs"
 require_text "$VOICE_HARNESS" 'assistant_url_base64' \
   "physical voice harness must use shell-safe URL transport"
+require_text "$VOICE_HARNESS" 'isProductionRestoreUrl' \
+  "physical voice harness must retain a bounded production restore path"
 require_text "$ENROLLMENT" 'KeyStore.getInstance("AndroidKeyStore")' \
   "Portal enrollment identity must remain in Android Keystore"
 require_text "$ENROLLMENT" '.put("deviceId", deviceId)' \
