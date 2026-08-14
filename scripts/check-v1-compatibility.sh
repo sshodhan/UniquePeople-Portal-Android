@@ -235,6 +235,15 @@ require_text "$MAIN" 'FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutP
 require_text "$MAIN" 'clockChrome.setBackgroundColor(Color.argb(132, 0, 0, 0));' \
   "clock overlay opacity/coverage changed from v1 compact panel"
 
+require_text "$MAIN" 'weather.optInt("temperatureF"' \
+  "native weather tile must keep reading the Fahrenheit wire fields"
+require_text "$MAIN" 'root.optString("temperatureUnit", "F")' \
+  "native weather tile must read the server temperature unit defensively, defaulting to Fahrenheit"
+require_text "$MAIN" '"°C" : "°F"' \
+  "native weather tile must keep rendering Fahrenheit for devices on an older server"
+require_text "$MAIN" '(fahrenheit - 32) * 5.0 / 9.0' \
+  "Celsius conversion must use floating-point division; 5 / 9 is integer 0 in Java"
+
 require_text "$STABILITY_DOC" 'UniquePeople v1 is live on one customer Portal' \
   "v1 stability document no longer describes production v1"
 require_text "$STABILITY_DOC" 'Server-Side Changes That Are Safe for v1' \
