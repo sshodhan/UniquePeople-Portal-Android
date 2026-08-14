@@ -295,6 +295,13 @@ public class AssistantActivity extends Activity {
                 copyNumber(inputData, data, "audioEndMs");
                 copyNumber(inputData, data, "itemCount");
                 copyNumber(inputData, data, "transcriptCount");
+                copyNumber(inputData, data, "tokenCount");
+                copyBoolean(inputData, data, "addressingNameObserved");
+                copyBoolean(inputData, data, "addressingNameOnly");
+                copyBoolean(inputData, data, "directedAtAssistant");
+                copyBoolean(inputData, data, "explicitControl");
+                copyBoolean(inputData, data, "expectedReply");
+                copyBoolean(inputData, data, "completesActiveTask");
                 copyNumber(inputData, data, "microphoneSampleCount");
                 copyNumber(inputData, data, "microphoneUnmutedSampleCount");
                 copyNumber(inputData, data, "microphoneAverageLevel");
@@ -318,6 +325,10 @@ public class AssistantActivity extends Activity {
 
     private static void copyNumber(JSONObject source, JSONObject target, String key) throws Exception {
         if (source.has(key) && source.opt(key) instanceof Number) target.put(key, source.opt(key));
+    }
+
+    private static void copyBoolean(JSONObject source, JSONObject target, String key) throws Exception {
+        if (source.has(key) && source.opt(key) instanceof Boolean) target.put(key, source.opt(key));
     }
 
     private static void copyStringArray(

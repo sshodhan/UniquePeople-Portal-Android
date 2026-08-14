@@ -181,6 +181,8 @@ require_text "$ASSISTANT" 'copyStringArray(inputData, data, "responseIdsOverlapp
   "physical voice harness must retain bounded response-overlap correlation"
 require_text "$ASSISTANT" 'copyNumber(inputData, data, "audioStartMs")' \
   "physical voice harness must retain bounded input audio windows"
+require_text "$ASSISTANT" 'copyBoolean(inputData, data, "explicitControl")' \
+  "physical voice harness must retain bounded ownership classification evidence"
 require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
   "physical voice harness must validate target and restore URLs"
 require_text "$VOICE_HARNESS" 'assistant_url_base64' \
