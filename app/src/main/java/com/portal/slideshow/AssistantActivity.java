@@ -25,6 +25,7 @@ import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 public class AssistantActivity extends Activity {
@@ -263,17 +264,37 @@ public class AssistantActivity extends Activity {
                 copyString(inputData, data, "turnId", 160);
                 copyString(inputData, data, "responseId", 160);
                 copyString(inputData, data, "taskId", 160);
+                copyString(inputData, data, "capabilityId", 160);
+                copyString(inputData, data, "captureId", 160);
+                copyString(inputData, data, "resultId", 160);
                 copyString(inputData, data, "candidateId", 160);
+                copyString(inputData, data, "episodeId", 160);
+                copyString(inputData, data, "itemId", 160);
                 copyString(inputData, data, "utteranceId", 160);
+                copyString(inputData, data, "turnIdAtStart", 160);
+                copyString(inputData, data, "taskIdAtStart", 160);
+                copyString(inputData, data, "capabilityIdAtStart", 160);
+                copyString(inputData, data, "captureIdAtStart", 160);
+                copyString(inputData, data, "responseIdAtStart", 160);
                 copyString(inputData, data, "reason", 96);
                 copyString(inputData, data, "terminalReason", 96);
                 copyString(inputData, data, "decision", 64);
                 copyString(inputData, data, "disposition", 96);
+                copyString(inputData, data, "ownership", 64);
+                copyString(inputData, data, "closeReason", 96);
                 copyString(inputData, data, "cancellationState", 64);
                 copyString(inputData, data, "playbackState", 64);
+                copyStringArray(inputData, data, "responseIdsOverlapped", 20, 160);
+                copyStringArray(inputData, data, "candidateIds", 20, 160);
+                copyStringArray(inputData, data, "itemIds", 20, 160);
                 copyNumber(inputData, data, "durationMs");
                 copyNumber(inputData, data, "transcriptLength");
                 copyNumber(inputData, data, "textLength");
+                copyNumber(inputData, data, "contentIndex");
+                copyNumber(inputData, data, "audioStartMs");
+                copyNumber(inputData, data, "audioEndMs");
+                copyNumber(inputData, data, "itemCount");
+                copyNumber(inputData, data, "transcriptCount");
                 copyNumber(inputData, data, "microphoneSampleCount");
                 copyNumber(inputData, data, "microphoneUnmutedSampleCount");
                 copyNumber(inputData, data, "microphoneAverageLevel");
@@ -297,6 +318,22 @@ public class AssistantActivity extends Activity {
 
     private static void copyNumber(JSONObject source, JSONObject target, String key) throws Exception {
         if (source.has(key) && source.opt(key) instanceof Number) target.put(key, source.opt(key));
+    }
+
+    private static void copyStringArray(
+            JSONObject source,
+            JSONObject target,
+            String key,
+            int maxItems,
+            int maxLength) throws Exception {
+        JSONArray sourceItems = source.optJSONArray(key);
+        if (sourceItems == null) return;
+        JSONArray outputItems = new JSONArray();
+        for (int index = 0; index < Math.min(sourceItems.length(), maxItems); index += 1) {
+            Object value = sourceItems.opt(index);
+            if (value instanceof String) outputItems.put(bounded((String) value, maxLength));
+        }
+        target.put(key, outputItems);
     }
 
     private static String bounded(String value, int maxLength) {

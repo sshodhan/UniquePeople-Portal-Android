@@ -173,6 +173,14 @@ require_text "$MANIFEST" 'android:permission="android.permission.DUMP"' \
   "physical voice harness entry point must remain shell-protected"
 require_text "$ASSISTANT" 'addJavascriptInterface(new PortalVoiceHarnessBridge(), "PortalVoiceHarness")' \
   "physical voice harness bridge must remain installed"
+require_text "$ASSISTANT" 'copyString(inputData, data, "episodeId", 160)' \
+  "physical voice harness must retain bounded input-episode correlation"
+require_text "$ASSISTANT" 'copyString(inputData, data, "itemId", 160)' \
+  "physical voice harness must retain bounded ASR-item correlation"
+require_text "$ASSISTANT" 'copyStringArray(inputData, data, "responseIdsOverlapped", 20, 160)' \
+  "physical voice harness must retain bounded response-overlap correlation"
+require_text "$ASSISTANT" 'copyNumber(inputData, data, "audioStartMs")' \
+  "physical voice harness must retain bounded input audio windows"
 require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
   "physical voice harness must validate target and restore URLs"
 require_text "$VOICE_HARNESS" 'assistant_url_base64' \
