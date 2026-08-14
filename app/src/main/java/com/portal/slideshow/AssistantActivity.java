@@ -296,6 +296,10 @@ public class AssistantActivity extends Activity {
                 copyNumber(inputData, data, "itemCount");
                 copyNumber(inputData, data, "transcriptCount");
                 copyNumber(inputData, data, "tokenCount");
+                copyBoolean(inputData, data, "transcriptionEvidenceAvailable");
+                copyNumber(inputData, data, "transcriptionTokenCount");
+                copyNumber(inputData, data, "transcriptionMeanLogprob");
+                copyNumber(inputData, data, "transcriptionMinimumLogprob");
                 copyBoolean(inputData, data, "addressingNameObserved");
                 copyBoolean(inputData, data, "addressingNameOnly");
                 copyBoolean(inputData, data, "directedAtAssistant");
