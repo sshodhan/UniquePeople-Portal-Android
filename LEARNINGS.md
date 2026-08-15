@@ -135,6 +135,10 @@ separate shell-only entry protected by a signature permission, validate all
 incoming URLs and bounded correlation identifiers, and allowlist fields again
 at the native logging boundary. Never log target URLs, credentials, transcript
 text, or arbitrary web payloads.
+When hosted coordination adds an identity or ownership field required for a
+physical release gate, update this native allowlist and its V1 guard in the
+same change; otherwise the behavior can be correct while the shipped harness
+is structurally unable to prove it.
 
 **Sibling risk:** WebView debugging bridges, deep links, update-test entry
 points, and any instrumentation that crosses from hosted code into the APK.

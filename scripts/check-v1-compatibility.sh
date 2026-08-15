@@ -177,12 +177,24 @@ require_text "$ASSISTANT" 'copyString(inputData, data, "episodeId", 160)' \
   "physical voice harness must retain bounded input-episode correlation"
 require_text "$ASSISTANT" 'copyString(inputData, data, "itemId", 160)' \
   "physical voice harness must retain bounded ASR-item correlation"
+require_text "$ASSISTANT" 'copyString(inputData, data, "activationId", 160)' \
+  "physical voice harness must retain bounded activation correlation"
+require_text "$ASSISTANT" 'copyString(inputData, data, "activationSource", 96)' \
+  "physical voice harness must retain bounded activation provenance"
+require_text "$ASSISTANT" 'copyBoolean(inputData, data, "activationBound")' \
+  "physical voice harness must retain coordinator activation ownership"
+require_text "$ASSISTANT" 'copyBoolean(inputData, data, "activationRequiresAddressingEvidence")' \
+  "physical voice harness must retain the activation addressing contract"
 require_text "$ASSISTANT" 'copyStringArray(inputData, data, "responseIdsOverlapped", 20, 160)' \
   "physical voice harness must retain bounded response-overlap correlation"
 require_text "$ASSISTANT" 'copyNumber(inputData, data, "audioStartMs")' \
   "physical voice harness must retain bounded input audio windows"
 require_text "$ASSISTANT" 'copyBoolean(inputData, data, "explicitControl")' \
   "physical voice harness must retain bounded ownership classification evidence"
+require_text "$ASSISTANT" 'copyBoolean(inputData, data, "effectiveEchoCancellation")' \
+  "physical voice harness must prove the effective WebView echo-cancellation path"
+require_text "$ASSISTANT" 'copyBoolean(inputData, data, "effectiveNoiseSuppression")' \
+  "physical voice harness must prove the effective WebView noise-suppression path"
 require_text "$ASSISTANT" 'copyNumber(inputData, data, "transcriptionMeanLogprob")' \
   "physical voice harness must retain bounded transcription confidence evidence"
 require_text "$VOICE_HARNESS" 'isAllowedAssistantUrl' \
