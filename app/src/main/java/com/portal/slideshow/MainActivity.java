@@ -79,6 +79,10 @@ public class MainActivity extends Activity {
     static final String KEY_TILE_RENDERER = "tile_renderer";
     static final String KEY_HOSTED_TILES_URL = "hosted_tiles_url";
     static final String KEY_WEATHER_TILE_TEXT = "weather_tile_text";
+    // A hint used to invalidate the cached tile text when the household changes
+    // scale. The unit actually rendered always comes from the dashboard payload
+    // that carried the reading.
+    static final String KEY_TEMPERATURE_UNIT = "temperature_unit";
     static final String KEY_STOCKS_TILE_TEXT = "stocks_tile_text";
     static final String KEY_LAST_DASHBOARD_REFRESH_MS = "last_dashboard_refresh_ms";
     static final String DEFAULT_SETTINGS_BASE_URL = "https://uniquepeople-web.vercel.app/settings";
@@ -315,7 +319,21 @@ public class MainActivity extends Activity {
         loadAndPlay();
         refreshRemoteConfigAsync(this, new RemoteConfigCallback() {
             public void onComplete(boolean success, String message) {
-                if (success) loadAndPlay();
+                if (success) {
+                    loadAndPlay();
+                    // Config may have dropped the cached tile text because the
+                    // temperature unit changed. Repaint first: clearing the
+                    // preference does not touch the TextView, so without this
+                    // the old reading stays on screen under its old label for
+                    // the whole network round-trip. This callback is posted to
+                    // the main thread, so the repaint is immediate.
+                    refreshClockChrome();
+                    // Then refresh through the same branch the periodic tick
+                    // uses, so the tile does not sit on "waiting for data" for
+                    // the 12-19 minutes until that tick lands.
+                    if (useHostedTiles(getSharedPreferences(PREFS, MODE_PRIVATE))) refreshHostedTiles();
+                    else refreshDashboardDataAsync();
+                }
             }
         });
         AndroidUpdateManager.checkOnLaunch(this);
@@ -985,6 +1003,21 @@ public class MainActivity extends Activity {
             } else if (TILE_RENDERER_NATIVE.equals(tileRenderer)) {
                 editor.putString(KEY_TILE_RENDERER, TILE_RENDERER_NATIVE);
             }
+            // Only when the server actually stated a unit. An absent field
+            // means "older server", not "prefers Fahrenheit" — persisting a
+            // preference the server never sent would be a guess stored as
+            // truth (LEARNINGS.md §1).
+            String temperatureUnit = dashboard.optString("temperatureUnit", "");
+            if ("C".equals(temperatureUnit) || "F".equals(temperatureUnit)) {
+                if (!temperatureUnit.equals(p.getString(KEY_TEMPERATURE_UNIT, "F"))) {
+                    // The cached tile text is already formatted, so it would
+                    // otherwise keep showing the old scale until the next
+                    // dashboard tick. Drop it and show "waiting" instead of a
+                    // confidently wrong reading.
+                    editor.remove(KEY_WEATHER_TILE_TEXT);
+                }
+                editor.putString(KEY_TEMPERATURE_UNIT, temperatureUnit);
+            }
         }
         if ("photo_host".equals(mode) || "photo-host".equals(mode)) {
             editor.putInt(KEY_MODE, MODE_PHOTO_HOST);
@@ -995,8 +1028,17 @@ public class MainActivity extends Activity {
         editor.apply();
     }
 
+    // Dashboard refreshes can overlap — the periodic tick, onResume, and the
+    // remote-config callback all start one. Without a token, an older response
+    // landing last would overwrite both the cached string and the visible tile,
+    // and after a unit change that means the wrong scale sticks until the next
+    // 12-19 minute tick. Strictly increasing, compared for equality, so only
+    // the newest request may apply its result.
+    private int dashboardRefreshGeneration = 0;
+
     private void refreshDashboardDataAsync() {
         final Context app = getApplicationContext();
+        final int generation = ++dashboardRefreshGeneration;
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -1010,15 +1052,22 @@ public class MainActivity extends Activity {
                     String body = readText(in);
                     if (code >= 400) throw new Exception("Dashboard returned HTTP " + code);
                     JSONObject root = new JSONObject(body);
-                    final String weatherText = formatWeatherTile(root.optJSONObject("weather"));
+                    // A server that predates this field yields "F", which is
+                    // exactly today's behavior (LEARNINGS.md §1).
+                    final String weatherText = formatWeatherTile(root.optJSONObject("weather"),
+                            root.optString("temperatureUnit", "F"));
                     final String stocksText = formatStocksTile(root.optJSONObject("sp500"), root.optJSONArray("stocks"), root.optJSONObject("status"));
-                    app.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                            .putString(KEY_WEATHER_TILE_TEXT, weatherText)
-                            .putString(KEY_STOCKS_TILE_TEXT, stocksText)
-                            .putLong(KEY_LAST_DASHBOARD_REFRESH_MS, System.currentTimeMillis())
-                            .apply();
                     ui.post(new Runnable() {
                         public void run() {
+                            // Generation is owned by the UI thread, so this
+                            // check and the writes below cannot interleave with
+                            // another response.
+                            if (generation != dashboardRefreshGeneration) return;
+                            app.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                    .putString(KEY_WEATHER_TILE_TEXT, weatherText)
+                                    .putString(KEY_STOCKS_TILE_TEXT, stocksText)
+                                    .putLong(KEY_LAST_DASHBOARD_REFRESH_MS, System.currentTimeMillis())
+                                    .apply();
                             if (weatherTile != null) weatherTile.setText(weatherText);
                             setStocksTileText(stocksText);
                             refreshClockChrome();
@@ -1026,7 +1075,10 @@ public class MainActivity extends Activity {
                     });
                 } catch (Exception ignored) {
                     ui.post(new Runnable() {
-                        public void run() { refreshClockChrome(); }
+                        public void run() {
+                            if (generation != dashboardRefreshGeneration) return;
+                            refreshClockChrome();
+                        }
                     });
                 }
             }
@@ -1059,8 +1111,13 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static String formatWeatherTile(JSONObject weather) {
+    // The server always sends Fahrenheit readings; temperatureUnit carries the
+    // household's display preference alongside them. Both come out of the same
+    // JSON object so the cached tile string can never mix a number from one
+    // fetch with a unit from another.
+    private static String formatWeatherTile(JSONObject weather, String temperatureUnit) {
         if (weather == null || !weather.optBoolean("enabled", false)) return DEFAULT_WEATHER_TILE_TEXT;
+        boolean celsius = "C".equalsIgnoreCase(temperatureUnit);
         String condition = weather.optString("condition", "Weather").toUpperCase(Locale.US);
         String icon = weather.optString("icon", "");
         int temp = weather.optInt("temperatureF", Integer.MIN_VALUE);
@@ -1070,12 +1127,22 @@ public class MainActivity extends Activity {
                 weather.optString("alert", ""));
         StringBuilder out = new StringBuilder();
         out.append(TextUtils.isEmpty(icon) ? "Weather" : icon).append(" ").append(condition);
-        if (temp != Integer.MIN_VALUE) out.append("  ").append(temp).append("°F");
+        if (temp != Integer.MIN_VALUE) {
+            out.append("  ").append(toDisplayTemperature(temp, celsius)).append(celsius ? "°C" : "°F");
+        }
         if (high != Integer.MIN_VALUE && low != Integer.MIN_VALUE) {
-            out.append("\nH ").append(high).append("  L ").append(low);
+            out.append("\nH ").append(toDisplayTemperature(high, celsius))
+                    .append("  L ").append(toDisplayTemperature(low, celsius));
         }
         out.append("\n").append(TextUtils.isEmpty(warning) ? "No alerts" : warning);
         return out.toString();
+    }
+
+    // Mirrors the web rule in public/tile-models.js so both renderers agree.
+    // 5.0 / 9.0 is deliberate: integer division would return 0 and flatten
+    // every Celsius reading to 0.
+    private static int toDisplayTemperature(int fahrenheit, boolean celsius) {
+        return celsius ? (int) Math.round((fahrenheit - 32) * 5.0 / 9.0) : fahrenheit;
     }
 
     private static String formatStocksTile(JSONObject sp500, JSONArray stocks, JSONObject status) {
