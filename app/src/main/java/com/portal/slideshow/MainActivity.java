@@ -321,10 +321,16 @@ public class MainActivity extends Activity {
             public void onComplete(boolean success, String message) {
                 if (success) {
                     loadAndPlay();
-                    // Config may have changed the temperature unit, which drops
-                    // the cached tile text. Refresh through the same branch the
-                    // periodic tick uses, otherwise the tile sits on "waiting
-                    // for data" for the 12-19 minutes until that tick lands.
+                    // Config may have dropped the cached tile text because the
+                    // temperature unit changed. Repaint first: clearing the
+                    // preference does not touch the TextView, so without this
+                    // the old reading stays on screen under its old label for
+                    // the whole network round-trip. This callback is posted to
+                    // the main thread, so the repaint is immediate.
+                    refreshClockChrome();
+                    // Then refresh through the same branch the periodic tick
+                    // uses, so the tile does not sit on "waiting for data" for
+                    // the 12-19 minutes until that tick lands.
                     if (useHostedTiles(getSharedPreferences(PREFS, MODE_PRIVATE))) refreshHostedTiles();
                     else refreshDashboardDataAsync();
                 }
@@ -1022,8 +1028,17 @@ public class MainActivity extends Activity {
         editor.apply();
     }
 
+    // Dashboard refreshes can overlap — the periodic tick, onResume, and the
+    // remote-config callback all start one. Without a token, an older response
+    // landing last would overwrite both the cached string and the visible tile,
+    // and after a unit change that means the wrong scale sticks until the next
+    // 12-19 minute tick. Strictly increasing, compared for equality, so only
+    // the newest request may apply its result.
+    private int dashboardRefreshGeneration = 0;
+
     private void refreshDashboardDataAsync() {
         final Context app = getApplicationContext();
+        final int generation = ++dashboardRefreshGeneration;
         new Thread(new Runnable() {
             public void run() {
                 try {
@@ -1042,13 +1057,17 @@ public class MainActivity extends Activity {
                     final String weatherText = formatWeatherTile(root.optJSONObject("weather"),
                             root.optString("temperatureUnit", "F"));
                     final String stocksText = formatStocksTile(root.optJSONObject("sp500"), root.optJSONArray("stocks"), root.optJSONObject("status"));
-                    app.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                            .putString(KEY_WEATHER_TILE_TEXT, weatherText)
-                            .putString(KEY_STOCKS_TILE_TEXT, stocksText)
-                            .putLong(KEY_LAST_DASHBOARD_REFRESH_MS, System.currentTimeMillis())
-                            .apply();
                     ui.post(new Runnable() {
                         public void run() {
+                            // Generation is owned by the UI thread, so this
+                            // check and the writes below cannot interleave with
+                            // another response.
+                            if (generation != dashboardRefreshGeneration) return;
+                            app.getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                                    .putString(KEY_WEATHER_TILE_TEXT, weatherText)
+                                    .putString(KEY_STOCKS_TILE_TEXT, stocksText)
+                                    .putLong(KEY_LAST_DASHBOARD_REFRESH_MS, System.currentTimeMillis())
+                                    .apply();
                             if (weatherTile != null) weatherTile.setText(weatherText);
                             setStocksTileText(stocksText);
                             refreshClockChrome();
@@ -1056,7 +1075,10 @@ public class MainActivity extends Activity {
                     });
                 } catch (Exception ignored) {
                     ui.post(new Runnable() {
-                        public void run() { refreshClockChrome(); }
+                        public void run() {
+                            if (generation != dashboardRefreshGeneration) return;
+                            refreshClockChrome();
+                        }
                     });
                 }
             }

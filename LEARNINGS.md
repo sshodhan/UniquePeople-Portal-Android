@@ -119,6 +119,45 @@ web repository's challenge-binding contract tests.
 
 ---
 
+## §5. Overlapping async refreshes need a generation token, and clearing a cache is not a repaint
+
+**Origin:** PR #16 (temperature unit on the native weather tile), Codex review,
+2026-08.
+
+**Incident:** the launch path already starts a dashboard refresh from
+`onResume`, and a second was added from the remote-config callback. Neither was
+sequenced, so a slower earlier response could land last and overwrite both the
+cached tile string and the visible tile. The same change cleared
+`KEY_WEATHER_TILE_TEXT` when the temperature unit changed and assumed that
+showed the waiting state — but removing a preference does not touch the
+`TextView`, so the old reading stayed on screen under its old unit label for
+the whole network round-trip.
+
+**Pattern:** this app caches *already-rendered strings* in `SharedPreferences`
+and repaints from them, so both halves matter:
+
+- Any handler that can be started from more than one trigger needs a strictly
+  increasing generation token, captured at start and compared for equality
+  before the result is applied. Own the counter on one thread — here the main
+  thread, because every caller posts there — so the check and the write cannot
+  interleave.
+- Invalidating cached state and refreshing the view are two separate actions.
+  After clearing a cached render, repaint immediately; do not let a network
+  round-trip stand between the user and a value already known to be wrong.
+- A stale value that is merely old is survivable. A stale value rendered under
+  a *changed* label is misinformation — the same number means something
+  different once the unit moves.
+
+**Sibling risk:** `refreshRemoteConfigAsync`, `refreshHostedTiles`, and
+`AndroidUpdateManager`'s check/download callbacks all write back after an
+await; any future tile whose formatted text is cached in preferences.
+
+**Guards:** brace/flow review plus the `Build` workflow; there is no JVM test
+harness in this repo, so the sequencing is documented at the call site rather
+than asserted by a test.
+
+---
+
 ## Key takeaways
 
 - §1 — Consume the web contract defensively: new fields may be absent, legacy
@@ -130,3 +169,5 @@ web repository's challenge-binding contract tests.
   deliberately or not added.
 - §4 — Keep hardware attestation input compact; persist the challenge, token,
   and key as one retryable transaction.
+- §5 — Generation-token any refresh with more than one trigger, and repaint
+  immediately after clearing a cached render rather than waiting on the network.
